@@ -950,7 +950,7 @@ def dar_baixa_op(id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    cursor.execute(f'UPDATE ordens_processo SET operador_nome = {param}, status = "Finalizado" WHERE id = {param}', (request.form.get('operador_nome', 'Operador'), id))
+    cursor.execute( f"UPDATE ordens_processo SET operador_nome = { param}, status = 'Finalizado' WHERE id = { param}", ( request.form.get('operador_nome', 'Operador'), id))
     conn.commit()
     conn.close()
     return redirect(url_for('pcp'))
