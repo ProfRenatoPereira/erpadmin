@@ -918,10 +918,12 @@ def abastecer_estoque_pcp():
     cursor.execute(f'SELECT COUNT(*) FROM ordens_processo WHERE pedido_id = {param}', (pedido_id,))
     row_ext = cursor.fetchone()
     
-    # Linha corrigida e alinhada para ler o valor de contagem no PostgreSQL/Supabase
+    # Tratamento seguro para DictRow e Tuplas extraindo o primeiro elemento
     ops_existentes = int(row_ext[0]) if row_ext else 0
     
-    cursor.execute(f'SELECT COUNT(*) FROM ordens_processo WHERE pedido_id = {param} AND status NOT LIKE \'Finalizado%\'', (pedido_id,))
+    # Passando o valor do LIKE com o símbolo de porcentagem de forma segura como parâmetro
+    status_like = 'Finalizado%'
+    cursor.execute(f'SELECT COUNT(*) FROM ordens_processo WHERE pedido_id = {param} AND status NOT LIKE {param}', (pedido_id, status_like))
     row_pend = cursor.fetchone()
     ops_pendentes = int(row_pend[0]) if row_pend else 0
     
