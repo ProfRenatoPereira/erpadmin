@@ -917,17 +917,13 @@ def abastecer_estoque_pcp():
     cursor = conn.cursor()
     cursor.execute(f'SELECT COUNT(*) FROM ordens_processo WHERE pedido_id = {param}', (pedido_id,))
     row_ext = cursor.fetchone()
-    # Correção para tratar tanto tuplas, dicionários (DictRow) quanto valores puros
-if hasattr(row_ext, 'keys') and len(row_ext) > 0:
-    ops_existentes = int(row_ext[0])
-elif isinstance(row_ext, (tuple, list)) and len(row_ext) > 0:
-    ops_existentes = int(row_ext[0])
-else:
-    ops_existentes = int(row_ext) if row_ext is not None else 0
+    
+    # Linha corrigida e alinhada para ler o valor de contagem no PostgreSQL/Supabase
+    ops_existentes = int(row_ext[0]) if row_ext else 0
     
     cursor.execute(f'SELECT COUNT(*) FROM ordens_processo WHERE pedido_id = {param} AND status NOT LIKE \'Finalizado%\'', (pedido_id,))
     row_pend = cursor.fetchone()
-    ops_pendentes = int(row_pend[0] if isinstance(row_pend, tuple) else row_pend)
+    ops_pendentes = int(row_pend[0]) if row_pend else 0
     
     if ops_existentes == 0 or ops_pendentes > 0:
         conn.close()
