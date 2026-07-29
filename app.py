@@ -1036,16 +1036,17 @@ def roi():
     cursor.execute("SELECT COALESCE(SUM(salario_base + valor_adicionais), 0) FROM maquinas WHERE operador_nome != 'Posto Vago - Aguardando MOD' AND operador_nome != ''")
     row_pes = cursor.fetchone()
     
-    # CORREÇÃO: Tratamento seguro de DictRow para a despesa de pessoal
-    despesa_pessoal = float(row_pes if hasattr(row_pes, 'keys') or isinstance(row_pes, dict) else row_pes[0])
+    # CORREÇÃO DEFINITIVA: Acessa o índice 0 independente se for Tupla ou DictRow
+    despesa_pessoal = float(row_pes[0]) if row_pes is not None else 0.0
     
     caixa, total = calcular_caixa_disponivel(conn)
     conn.close()
     
-    rec = float(v_dados['receita_bruta'] if hasattr(v_dados, 'keys') or isinstance(v_dados, dict) else v_dados[0])
-    pecas = float(v_dados['total_pecas'] if hasattr(v_dados, 'keys') or isinstance(v_dados, dict) else v_dados[1])
-    cap = float(invs['capital_total'] if hasattr(invs, 'keys') or isinstance(invs, dict) else invs[0])
-    aluguel = float(invs['aluguel'] if hasattr(invs, 'keys') or isinstance(invs, dict) else invs[1])
+    # Tratamento seguro para chaves de strings ou índices numéricos nas consultas com aliases
+    rec = float(v_dados['receita_bruta'] if (hasattr(v_dados, 'keys') or isinstance(v_dados, dict)) and 'receita_bruta' in v_dados else v_dados[0])
+    pecas = float(v_dados['total_pecas'] if (hasattr(v_dados, 'keys') or isinstance(v_dados, dict)) and 'total_pecas' in v_dados else v_dados[1])
+    cap = float(invs['capital_total'] if (hasattr(invs, 'keys') or isinstance(invs, dict)) and 'capital_total' in invs else invs[0])
+    aluguel = float(invs['aluguel'] if (hasattr(invs, 'keys') or isinstance(invs, dict)) and 'aluguel' in invs else invs[1])
     
     sobra = rec - despesa_pessoal - aluguel
     payback_meses = (cap / sobra) if sobra > 0 else 0.0
