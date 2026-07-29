@@ -1036,7 +1036,9 @@ def roi():
     cursor.execute("SELECT COALESCE(SUM(salario_base + valor_adicionais), 0) FROM maquinas WHERE operador_nome != 'Posto Vago - Aguardando MOD' AND operador_nome != ''")
     row_pes = cursor.fetchone()
     
-    despesa_pessoal = float(row_pes[0] if isinstance(row_pes, tuple) else row_pes)
+    # CORREÇÃO: Tratamento seguro de DictRow para a despesa de pessoal
+    despesa_pessoal = float(row_pes if hasattr(row_pes, 'keys') or isinstance(row_pes, dict) else row_pes[0])
+    
     caixa, total = calcular_caixa_disponivel(conn)
     conn.close()
     
