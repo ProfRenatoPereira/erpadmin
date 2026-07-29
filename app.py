@@ -917,7 +917,13 @@ def abastecer_estoque_pcp():
     cursor = conn.cursor()
     cursor.execute(f'SELECT COUNT(*) FROM ordens_processo WHERE pedido_id = {param}', (pedido_id,))
     row_ext = cursor.fetchone()
-    ops_existentes = int(row_ext[0] if isinstance(row_ext, tuple) else row_ext)
+    # Correção para tratar tanto tuplas, dicionários (DictRow) quanto valores puros
+if hasattr(row_ext, 'keys') and len(row_ext) > 0:
+    ops_existentes = int(row_ext[0])
+elif isinstance(row_ext, (tuple, list)) and len(row_ext) > 0:
+    ops_existentes = int(row_ext[0])
+else:
+    ops_existentes = int(row_ext) if row_ext is not None else 0
     
     cursor.execute(f'SELECT COUNT(*) FROM ordens_processo WHERE pedido_id = {param} AND status NOT LIKE \'Finalizado%\'', (pedido_id,))
     row_pend = cursor.fetchone()
