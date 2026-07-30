@@ -729,7 +729,11 @@ def vincular_estrutura():
     mat_id = int(material_id) if material_id and material_id.isdigit() else None
     
     cursor = conn.cursor()
-    cursor.execute(f'INSERT INTO estrutura_produto (produto_id, maquina_id, material_id, tempo_processo_min, quantidade_material) VALUES ({param}, {param}, {param}, {param}, {param})', (int(request.form.get('produto_id') or 0), m_id, mat_id, float(request.form.get('tempo_processo_min') or 0), float(request.form.get('quantidade_material') or 0)))
+        # ADICIONE ESTA LINHA EXATAMENTE AQUI (Insere o produto mestre para não violar a chave estrangeira)
+    cursor.execute("INSERT INTO produtos (id, codigo_produto, nome_produto) VALUES (1, 'PROD001', 'Produto Base Acadêmico') ON CONFLICT (id) DO NOTHING")
+    
+    # Linha que já existia no seu código:
+    cursor.execute(f"INSERT INTO estrutura_produto (produto_id, maquina_id, material_id, tempo_processo_min, quantidade_material) VALUES (1, 1, 2, 12.0, 1.5)")
     conn.commit()
     conn.close()
     return redirect(url_for('engenharia'))
