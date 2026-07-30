@@ -14,17 +14,11 @@ app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/', prefix='static/')
 # DIRECIONAMENTO DO BANCO: 
 # Se houver DATABASE_URL (Supabase no Render), ele mapeia as tabelas usando o psycopg2.
 # Caso contrário, mantém o arquivo local padrão intacto.
-# CORREÇÃO: Substitui o prefixo 'postgres://' por 'postgresql://' se fornecido pelo Render.
-banco_url = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
-if banco_url.startswith("postgres://"):
-    banco_url = banco_url.replace("postgres://", "postgresql://", 1)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = banco_url
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 DATABASE = 'database.db'
-
 CATALOGO_MAQUINAS = {
     'cnc_romi': {'nome': 'Centro de Usinagem CNC ROMI 5X', 'pot': 22.0, 'cons': 15.4, 'vel': '8000', 'avan': '20000', 'comp': 1000, 'diam': 500, 'mnt': 1000, 'preco': 620000.0, 'dep': 5166.66, 'venda': 124000.0, 'operador': 'Carlos Souza (Técnico CNC)', 'custo_op': 0.45, 'salario': 3100.0, 'adic': 930.0, 'vida': 120},
     'prensa_100t': {'nome': 'Prensa Hidráulica Industrial 100T', 'pot': 15.0, 'cons': 10.5, 'vel': '60', 'avan': '1200', 'comp': 800, 'diam': 800, 'mnt': 1500, 'preco': 220000.0, 'dep': 1833.33, 'venda': 44000.0, 'operador': 'Marcos Lima (Meio Oficial)', 'custo_op': 0.22, 'salario': 1850.0, 'adic': 282.40, 'vida': 120},
@@ -34,7 +28,6 @@ CATALOGO_MAQUINAS = {
     'compressor_parafuso': {'nome': 'Compressor de Ar de Parafuso', 'pot': 11.0, 'cons': 8.8, 'vel': '10 bar', 'avan': 'Contínuo', 'comp': 600, 'diam': 400, 'mnt': 600, 'preco': 35000.0, 'dep': 291.66, 'venda': 7000.0, 'operador': 'Posto de Apoio / Indireto', 'custo_op': 0.0, 'salario': 0.0, 'adic': 0.0, 'vida': 120},
     'jato_areia': {'nome': 'Jato de Areia Pressurizado', 'pot': 5.5, 'cons': 4.1, 'vel': 'N/A', 'avan': 'Manual', 'comp': 800, 'diam': 600, 'mnt': 400, 'preco': 28000.0, 'dep': 233.33, 'venda': 5600.0, 'operador': 'Auxiliar de Jateamento', 'custo_op': 0.20, 'salario': 1512.0, 'adic': 282.40, 'vida': 120}
 }
-
 CATALOGO_MATERIAIS = {
     'tub_mec': {'cod': 'TUB-MEC-ST52', 'nome': 'Tubo Mecânico de Alta Resistência ST52', 'preco': 45.50, 'dim': 'Ø 3 pol x 2000mm', 'vol': 150.0},
     'tar_aco': {'cod': 'TAR-ACO-4140', 'nome': 'Tarugo Redondo Aço Liga SAE 4140', 'preco': 28.90, 'dim': 'Ø 2 pol x 1000mm', 'vol': 300.0},
@@ -51,17 +44,11 @@ def get_db_connection():
     if url_banco:
         if url_banco.startswith("postgres://"):
             url_banco = url_banco.replace("postgres://", "postgresql://", 1)
-        try:
-            import psycopg2
-            import psycopg2.extras
-            conn = psycopg2.connect(url_banco)
-            conn.cursor_factory = psycopg2.extras.DictCursor
-            return conn
-        except ImportError:
-            # Fallback de segurança caso o pacote psycopg2 não esteja instalado localmente durante testes
-            conn = sqlite3.connect(DATABASE)
-            conn.row_factory = sqlite3.Row
-            return conn
+        import psycopg2
+        import psycopg2.extras
+        conn = psycopg2.connect(url_banco)
+        conn.cursor_factory = psycopg2.extras.DictCursor
+        return conn
     else:
         conn = sqlite3.connect(DATABASE)
         conn.row_factory = sqlite3.Row
@@ -69,56 +56,44 @@ def get_db_connection():
 
 def init_db():
     conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
+    cursor = conn.cursor()
+    
+    # Identifica se é PostgreSQL (Supabase) para usar a sintaxe correta de autoincremento
+    is_postgres = not hasattr(conn, 'row_factory')
+    pk_auto = "SERIAL PRIMARY KEY" if is_postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    text_type = "TEXT"
+    real_type = "REAL"
+    text_default = "TEXT" if is_postgres else "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+    ts_default = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS usuarios (id {pk_auto}, usuario {text_type} UNIQUE NOT NULL, senha {text_type} NOT NULL, aprovado INTEGER DEFAULT 0)')
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS caixa (id {pk_auto}, saldo {real_type} DEFAULT 0.0, capital_inicial {real_type} DEFAULT 0.0)')
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS investimentos_imobiliarios (id {pk_auto}, turma_nome {text_type} NOT NULL, cidade_regiao {text_type} NOT NULL, bairro_imovel {text_type} NOT NULL, area_imovel {real_type} NOT NULL, taxa_selic {real_type} NOT NULL, valor_imovel_estimado {real_type} NOT NULL, aluguel_regional {real_type} NOT NULL, perc_acionistas {real_type} NOT NULL, capital_inicial_negocio {real_type} DEFAULT 0.0)')
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS maquinas (id {pk_auto}, nome_equipamento {text_type} NOT NULL, potencia {real_type} NOT NULL, consumo_eletrico {real_type} NOT NULL, velocidade {text_type}, avanco {text_type}, comprimento_max {real_type}, diametro_max {real_type}, frequencia_manutencao INTEGER NOT NULL, horas_trabalhadas INTEGER DEFAULT 0, preco_compra {real_type} NOT NULL, depreciacao_mensal {real_type} NOT NULL, valor_venda_final {real_type} NOT NULL, custo_minuto_maquina {real_type} NOT NULL, operador_nome {text_type} DEFAULT \'Posto Vago - Aguardando MOD\', custo_minuto_operador {real_type} DEFAULT 0.0, salario_base {real_type} DEFAULT 0.0, valor_adicionais {real_type} DEFAULT 0.0, turno_trabalho {text_type} DEFAULT \'Diurno\', dia_semana {text_type} DEFAULT \'Regular\', vida_util_meses INTEGER DEFAULT 120)')
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS materiais (id {pk_auto}, codigo_material {text_type} UNIQUE NOT NULL, nome_material {text_type} NOT NULL, preco_unidade {real_type} NOT NULL, dimensoes {text_type}, volume_disponivel {real_type} NOT NULL)')
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS requisicoes_compras (id {pk_auto}, equipamento_tipo {text_type} NOT NULL, especificacao_desejada {text_type} NOT NULL, quantidade INTEGER DEFAULT 1, status {text_type} DEFAULT \'Pendente em Cotação\', preco_cotado {real_type} DEFAULT 0, potencia_cotada {real_type} DEFAULT 0, depreciacao_sugerida {real_type} DEFAULT 0, vida_util_sugerida INTEGER DEFAULT 120, data_requisicao {ts_default})')
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS produtos (id {pk_auto}, codigo_produto {text_type} UNIQUE NOT NULL, nome_produto {text_type} NOT NULL, custo_total_fabricacao {real_type} DEFAULT 0)')
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS estrutura_produto (id {pk_auto}, produto_id INTEGER NOT NULL, maquina_id INTEGER, material_id INTEGER, tempo_processo_min {real_type} DEFAULT 0, quantidade_material {real_type} DEFAULT 0, FOREIGN KEY(produto_id) REFERENCES produtos(id))')
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS formacao_precos (id {pk_auto}, produto_id INTEGER UNIQUE NOT NULL, imposto_municipal {real_type} DEFAULT 0, imposto_estadual {real_type} DEFAULT 0, imposto_federal {real_type} DEFAULT 0, margem_lucro {real_type} DEFAULT 0, preco_venda_final {real_type} DEFAULT 0, FOREIGN KEY(produto_id) REFERENCES produtos(id))')
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS estoque_produtos (id {pk_auto}, produto_id INTEGER UNIQUE NOT NULL, quantidade_disponivel {real_type} DEFAULT 0, FOREIGN KEY(produto_id) REFERENCES produtos(id))')
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS pedidos_vendas (id {pk_auto}, produto_id INTEGER NOT NULL, quantidade INTEGER NOT NULL, desconto_percentual {real_type} DEFAULT 0, observacoes {text_type}, data_pedido {ts_default}, FOREIGN KEY(produto_id) REFERENCES produtos(id))')
+    cursor.execute(f'CREATE TABLE IF NOT EXISTS ordens_processo (id {pk_auto}, pedido_id INTEGER NOT NULL, numero_operacao {text_type} NOT NULL, maquina_name {text_type} NOT NULL, codigo_produto {text_type} NOT NULL, nome_produto {text_type} NOT NULL, data_entrada {text_type} NOT NULL, tempo_estimado_min {real_type} NOT NULL, data_saida {text_type} NOT NULL, operador_nome {text_type} DEFAULT \'Pendente\', status {text_type} DEFAULT \'Na Fila\', custo_operacao {real_type} DEFAULT 0.0, FOREIGN KEY(pedido_id) REFERENCES pedidos_vendas(id))')
+    conn.commit()
+    
+    # Adaptação para leitura de contagem tanto no SQLite quanto no PostgreSQL
+    cursor.execute('SELECT COUNT(*) AS total FROM investimentos_imobiliarios')
+    row = cursor.fetchone()
+    total_registros = row[0] if isinstance(row, tuple) else row['total']
+
+    if total_registros == 0:
+        # Se for PostgreSQL substitui os marcadores '?' por '%s' dinamicamente
+        param = "%s" if is_postgres else "?"
         
-        # Identifica se é PostgreSQL (Supabase) para usar a sintaxe correta de autoincremento
-        is_postgres = not hasattr(conn, 'row_factory')
-        pk_auto = "SERIAL PRIMARY KEY" if is_postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
-        text_type = "TEXT"
-        real_type = "REAL"
-        ts_default = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
-
-        # Tabelas base do sistema
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS usuarios (id {pk_auto}, usuario {text_type} UNIQUE NOT NULL, senha {text_type} NOT NULL, aprovado INTEGER DEFAULT 0)')
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS caixa (id {pk_auto}, saldo {real_type} DEFAULT 0.0, capital_inicial {real_type} DEFAULT 0.0)')
+        cursor.execute(f'''
+            INSERT INTO investimentos_imobiliarios (turma_nome, city_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio)
+            VALUES ('Metalúrgica Modelo S/A - Cenário Base', 'Curitiba CIC', 'CIC (Distrito Industrial)', 450.00, 11.39, 3825000.00, 13500.00, 25.0, 500000.00)
+        ''')
         
-        # NOVA TABELA: Guarda o nome da equipe e vincula as configurações iniciais criadas pelo professor/aluno
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS configuracao_equipe (id {pk_auto}, nome_equipe {text_type} NOT NULL, aporte_inicial {real_type} DEFAULT 0.0, data_inicializacao {ts_default})')
-
-        # Demais tabelas do ecossistema ERP (Mantidas intactas)
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS investimentos_imobiliarios (id {pk_auto}, turma_nome {text_type} NOT NULL, cidade_regiao {text_type} NOT NULL, bairro_imovel {text_type} NOT NULL, area_imovel {real_type} NOT NULL, taxa_selic {real_type} NOT NULL, valor_imovel_estimado {real_type} NOT NULL, aluguel_regional {real_type} NOT NULL, perc_acionistas {real_type} NOT NULL, capital_inicial_negocio {real_type} DEFAULT 0.0)')
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS maquinas (id {pk_auto}, nome_equipamento {text_type} NOT NULL, potencia {real_type} NOT NULL, consumo_eletrico {real_type} NOT NULL, velocidade {text_type}, avanco {text_type}, comprimento_max {real_type}, diametro_max {real_type}, frequencia_manutencao INTEGER NOT NULL, horas_trabalhadas INTEGER DEFAULT 0, preco_compra {real_type} NOT NULL, depreciacao_mensal {real_type} NOT NULL, valor_venda_final {real_type} NOT NULL, custo_minuto_maquina {real_type} NOT NULL, operador_nome {text_type} DEFAULT \'Posto Vago - Aguardando MOD\', custo_minuto_operador {real_type} DEFAULT 0.0, salario_base {real_type} DEFAULT 0.0, valor_adicionais {real_type} DEFAULT 0.0, turno_trabalho {text_type} DEFAULT \'Diurno\', dia_semana {text_type} DEFAULT \'Regular\', vida_util_meses INTEGER DEFAULT 120)')
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS materiais (id {pk_auto}, codigo_material {text_type} UNIQUE NOT NULL, nome_material {text_type} NOT NULL, preco_unidade {real_type} NOT NULL, dimensoes {text_type}, volume_disponivel {real_type} NOT NULL)')
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS requisicoes_compras (id {pk_auto}, equipamento_tipo {text_type} NOT NULL, especificacao_desejada {text_type} NOT NULL, quantidade INTEGER DEFAULT 1, status {text_type} DEFAULT \'Pendente em Cotação\', preco_cotado {real_type} DEFAULT 0, potencia_cotada {real_type} DEFAULT 0, depreciacao_sugerida {real_type} DEFAULT 0, vida_util_sugerida INTEGER DEFAULT 120, data_requisicao {ts_default})')
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS produtos (id {pk_auto}, codigo_produto {text_type} UNIQUE NOT NULL, nome_produto {text_type} NOT NULL, custo_total_fabricacao {real_type} DEFAULT 0)')
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS estrutura_produto (id {pk_auto}, produto_id INTEGER NOT NULL, maquina_id INTEGER, material_id INTEGER, tempo_processo_min {real_type} DEFAULT 0, quantidade_material {real_type} DEFAULT 0, FOREIGN KEY(produto_id) REFERENCES produtos(id))')
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS formacao_precos (id {pk_auto}, produto_id INTEGER UNIQUE NOT NULL, imposto_municipal {real_type} DEFAULT 0, imposto_estadual {real_type} DEFAULT 0, imposto_federal {real_type} DEFAULT 0, margem_lucro {real_type} DEFAULT 0, preco_venda_final {real_type} DEFAULT 0, FOREIGN KEY(produto_id) REFERENCES produtos(id))')
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS estoque_produtos (id {pk_auto}, produto_id INTEGER UNIQUE NOT NULL, quantidade_disponivel {real_type} DEFAULT 0, FOREIGN KEY(produto_id) REFERENCES produtos(id))')
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS pedidos_vendas (id {pk_auto}, produto_id INTEGER NOT NULL, quantidade INTEGER NOT NULL, desconto_percentual {real_type} DEFAULT 0, observacoes {text_type}, data_pedido {ts_default}, FOREIGN KEY(produto_id) REFERENCES produtos(id))')
-        cursor.execute(f'CREATE TABLE IF NOT EXISTS ordens_processo (id {pk_auto}, pedido_id INTEGER NOT NULL, numero_operacao {text_type} NOT NULL, maquina_name {text_type} NOT NULL, codigo_produto {text_type} NOT NULL, nome_produto {text_type} NOT NULL, data_entrada {text_type} NOT NULL, tempo_estimado_min {real_type} NOT NULL, data_saida {text_type} NOT NULL, operador_nome {text_type} DEFAULT \'Pendente\', status {text_type} DEFAULT \'Na Fila\', custo_operacao {real_type} DEFAULT 0.0, FOREIGN KEY(pedido_id) REFERENCES pedidos_vendas(id))')
-        conn.commit()
-        
-        # Adaptação para leitura de contagem tanto no SQLite quanto no PostgreSQL
-        cursor.execute('SELECT COUNT(*) AS total FROM investimentos_imobiliarios')
-        row = cursor.fetchone()
-        total_registros = row[0] if isinstance(row, tuple) else row['total']
-
-        if total_registros == 0:
-            # Se for PostgreSQL substitui os marcadores '?' por '%s' dinamicamente
-            param = "%s" if is_postgres else "?"
-            
-            # CORREÇÃO AQUI: Mudado de 'city_regiao' para 'cidade_regiao' para bater com o banco
-            cursor.execute(f'''
-                INSERT INTO investimentos_imobiliarios (turma_nome, cidade_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio)
-                VALUES ({param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param})
-            ''', ('Metalúrgica Modelo S/A - Cenário Base', 'Curitiba CIC', 'CIC (Distrito Industrial)', 450.00, 11.39, 3825000.00, 13500.00, 25.0, 500000.00))
-            conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
-
-       # ALINHAMENTO CORRETO: Sem espaços extras à esquerda para sumir com o IndentationError
         for k, m in CATALOGO_MAQUINAS.items():
             if k in ['cnc_romi', 'prensa_100t', 'forno_tempera']:
                 minutos_mes = 44 * 4.33 * 60
@@ -129,83 +104,58 @@ def init_db():
                 ''', (m['nome'], m['pot'], m['cons'], m['vel'], m['avan'], m['comp'], m['diam'], m['mnt'], m['preco'], m['dep'], m['venda'], c_mm, m['operador'], m['custo_op'], m['salario'], m['adic'], m['vida']))
                 
         for mat in CATALOGO_MATERIAIS.values():
-            if is_postgres:
-                cursor.execute(f"INSERT INTO materiais (codigo_material, nome_material, preco_unidade, dimensoes, volume_disponivel) VALUES ({param}, {param}, {param}, {param}, {param}) ON CONFLICT (codigo_material) DO NOTHING", (mat['cod'], mat['nome'], mat['preco'], mat['dim'], mat['vol']))
-            else:
-                cursor.execute(f"INSERT OR IGNORE INTO materiais (codigo_material, nome_material, preco_unidade, dimensoes, volume_disponivel) VALUES ({param}, {param}, {param}, {param}, {param})", (mat['cod'], mat['nome'], mat['preco'], mat['dim'], mat['vol']))
+            cursor.execute(f"INSERT INTO materiais (codigo_material, nome_material, preco_unidade, dimensoes, volume_disponivel) VALUES ({param}, {param}, {param}, {param}, {param})", (mat['cod'], mat['nome'], mat['preco'], mat['dim'], mat['vol']))
             
+        # 1. Garante a limpeza prévia em caso de reinicializações sucessivas
         cursor.execute("DELETE FROM estoque_produtos")
         cursor.execute("DELETE FROM formacao_precos")
         cursor.execute("DELETE FROM estrutura_produto")
         cursor.execute("DELETE FROM produtos")
         
-        if is_postgres:
-            cursor.execute(f"INSERT INTO produtos (id, codigo_produto, nome_produto, custo_total_fabricacao) VALUES (1, 'PROD-EIXO-CNC', 'Eixo de Transmissão Usinado', 115.40) ON CONFLICT (id) DO NOTHING")
-            conn.commit()
-            cursor.execute(f"INSERT INTO estrutura_produto (id, produto_id, maquina_id, material_id, tempo_processo_min, quantidade_material) VALUES (1, 1, 1, 2, 12.0, 1.5) ON CONFLICT (id) DO NOTHING")
-            cursor.execute(f"INSERT INTO formacao_precos (id, produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES (1, 1, 5.0, 18.0, 9.25, 35.0, 245.50) ON CONFLICT (id) DO NOTHING")
-            cursor.execute(f"INSERT INTO estoque_produtos (id, produto_id, quantidade_disponivel) VALUES (1, 1, 25.0) ON CONFLICT (id) DO NOTHING")
-        else:
-            cursor.execute(f"INSERT OR REPLACE INTO produtos (id, codigo_produto, nome_produto, custo_total_fabricacao) VALUES (1, 'PROD-EIXO-CNC', 'Eixo de Transmissão Usinado', 115.40)")
-            conn.commit()
-            cursor.execute(f"INSERT OR REPLACE INTO estrutura_produto (id, produto_id, maquina_id, material_id, tempo_processo_min, quantidade_material) VALUES (1, 1, 1, 2, 12.0, 1.5)")
-            cursor.execute(f"INSERT OR REPLACE INTO formacao_precos (id, produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES (1, 1, 5.0, 18.0, 9.25, 35.0, 245.50)")
-            cursor.execute(f"INSERT OR REPLACE INTO estoque_produtos (id, produto_id, quantidade_disponivel) VALUES (1, 1, 25.0)")
+        # 2. Insere fixando o ID em 1 para dar suporte perfeito às restrições FK
+        cursor.execute(f"INSERT INTO produtos (id, codigo_produto, nome_produto, custo_total_fabricacao) VALUES (1, 'PROD-EIXO-CNC', 'Eixo de Transmissão Usinado', 115.40)")
         
+        # 3. Força o commit do produto mestre de forma síncrona
         conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+        
+        # 4. Popula com total segurança as tabelas dependentes associadas ao ID 1
+        cursor.execute(f"INSERT INTO estrutura_produto (produto_id, maquina_id, material_id, tempo_processo_min, quantidade_material) VALUES (1, 1, 2, 12.0, 1.5)")
+        cursor.execute(f"INSERT INTO formacao_precos (produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES (1, 5.0, 18.0, 9.25, 35.0, 245.50)")
+        cursor.execute(f"INSERT INTO estoque_produtos (produto_id, quantidade_disponivel) VALUES (1, 25.0)")
+        conn.commit()
+    conn.close()
 
 # Executa a inicialização de tabelas e injeção do cenário
 def calcular_caixa_disponivel(conn):
     # Trata de forma unificada o formato das tuplas retornadas no SQLite e no PostgreSQL
     def valor_campo(row, chave, indice=0):
         if row is None: return 0.0
-        try:
-            if hasattr(row, 'keys') or isinstance(row, dict):
-                return float(row[chave])
-        except (KeyError, IndexError):
-            pass
-        return float(row[indice])
+        return float(row[chave] if hasattr(row, 'keys') or isinstance(row, dict) else row[indice])
 
     cursor = conn.cursor()
-    try:
-        # MODIFICAÇÃO PEDAGÓGICA: Verifica se já existe um aporte inicial configurado pela equipe na nova tabela
-        cursor.execute('SELECT nome_equipe, aporte_inicial FROM configuracao_equipe ORDER BY id DESC LIMIT 1')
-        config_atual = cursor.fetchone()
-        
-        cursor.execute('SELECT capital_inicial_negocio, aluguel_regional FROM investimentos_imobiliarios ORDER BY id DESC LIMIT 1')
-        ult_imovel = cursor.fetchone()
-        
-        if not ult_imovel: 
-            return 0.0, 0.0
-            
-        aluguel_fixo = valor_campo(ult_imovel, 'aluguel_regional', 1)
-        
-        # Se o simulador já foi inicializado com um formulário de equipe, usa o aporte digitado. 
-        # Caso contrário, usa o valor padrão do cenário base (500000.00).
-        if config_atual:
-            capital_inicial = valor_campo(config_atual, 'aporte_inicial', 1)
-        else:
-            capital_inicial = valor_campo(ult_imovel, 'capital_inicial_negocio', 0)
-        
-        cursor.execute('SELECT COALESCE(SUM(preco_compra), 0) AS total FROM maquinas')
-        investido_maquinas = valor_campo(cursor.fetchone(), 'total', 0)
 
-        cursor.execute('SELECT COALESCE(SUM(preco_unidade * volume_disponivel), 0) AS total FROM materiais')
-        comprado_materials = valor_campo(cursor.fetchone(), 'total', 0)
+    cursor.execute('SELECT capital_inicial_negocio, aluguel_regional FROM investimentos_imobiliarios ORDER BY id DESC LIMIT 1')
+    ult_imovel = cursor.fetchone()
+    if not ult_imovel: 
+        return 0.0, 0.0
+    
+    capital_inicial = valor_campo(ult_imovel, 'capital_inicial_negocio', 0)
+    aluguel_fixo = valor_campo(ult_imovel, 'aluguel_regional', 1)
+    
+    cursor.execute('SELECT COALESCE(SUM(preco_compra), 0) FROM maquinas')
+    investido_maquinas = valor_campo(cursor.fetchone(), 0, 0)
 
-        cursor.execute('SELECT COALESCE(SUM(fp.preco_venda_final * pv.quantidade), 0) AS total FROM pedidos_vendas pv JOIN formacao_precos fp ON pv.produto_id = fp.produto_id')
-        faturamento = valor_campo(cursor.fetchone(), 'total', 0)
+    cursor.execute('SELECT COALESCE(SUM(preco_unidade * volume_disponivel), 0) FROM materiais')
+    comprado_materials = valor_campo(cursor.fetchone(), 0, 0)
 
-        cursor.execute("SELECT COALESCE(SUM(salario_base + valor_adicionais), 0) AS total FROM maquinas WHERE operador_nome != 'Posto Vago - Aguardando MOD' AND operador_nome != ''")
-        folha_rh = valor_campo(cursor.fetchone(), 'total', 0)
-        
-        caixa_atual = capital_inicial - investido_maquinas - comprado_materials + faturamento - folha_rh - aluguel_fixo
-        return caixa_atual, capital_inicial
-    finally:
-        cursor.close()
+    cursor.execute('SELECT COALESCE(SUM(fp.preco_venda_final * pv.quantidade), 0) FROM pedidos_vendas pv JOIN formacao_precos fp ON pv.produto_id = fp.produto_id')
+    faturamento = valor_campo(cursor.fetchone(), 0, 0)
+
+    cursor.execute("SELECT COALESCE(SUM(salario_base + valor_adicionais), 0) FROM maquinas WHERE operador_nome != 'Posto Vago - Aguardando MOD' AND operador_nome != ''")
+    folha_rh = valor_campo(cursor.fetchone(), 0, 0)
+    
+    caixa_atual = capital_inicial - investido_maquinas - comprado_materials + faturamento - folha_rh - aluguel_fixo
+    return caixa_atual, capital_inicial
 
 @app.route('/')
 def index():
@@ -222,102 +172,60 @@ def login_validar():
     cursor = conn.cursor()
     cursor.execute(f'SELECT * FROM usuarios WHERE usuario = {param}', (user_input,))
     user = cursor.fetchone()
-    cursor.close()
     conn.close()
     
     if user and check_password_hash(user['senha'], pass_input):
         session['logado'] = True
         session['usuario_equipe'] = user_input
         flash('Credenciais validadas com sucesso!', 'success')
-        
-        # MODIFICAÇÃO: Em vez de ir direto para 'estrutura', envia para a tela de inicialização
-        return redirect(url_for('configurar_rodada'))
+        return redirect(url_for('estrutura'))
     else:
         flash('Usuário ou senha inválidos!', 'danger')
         return redirect(url_for('index'))
 
-# NOVA ROTA: Renderiza a página com os campos solicitados (Nome da equipe e Aporte)
-@app.route('/configurar_rodada', methods=['GET'])
-def configurar_rodada():
-    if not session.get('logado'): 
-        return redirect(url_for('index'))
-    return render_template('inicializar.html')
-
-# ROTA AJUSTADA: Processa os dados inseridos na tela intermediária e limpa/prepara o simulador
 @app.route('/inicializar_simulador', methods=['POST'])
 def inicializar_simulador():
-    if not session.get('logado'): 
-        return redirect(url_for('index'))
-        
-    # Coleta os dados do novo formulário (inicializar.html)
+    if not session.get('logado'): return redirect(url_for('index'))
     nome_empresa = request.form.get('nome_empresa', 'Empresa Simulada S/A')
-    try: 
-        capital_inicial = float(request.form.get('capital_inicial', 0))
-    except ValueError: 
-        capital_inicial = 0.0
-        
+    try: capital_inicial = float(request.form.get('capital_inicial', 0))
+    except ValueError: capital_inicial = 0.0
     conn = get_db_connection()
     is_postgres = not hasattr(conn, 'row_factory')
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        # Limpeza segura de dados de simulações passadas
-        cursor.execute('DELETE FROM ordens_processo')
-        cursor.execute('DELETE FROM pedidos_vendas')
-        cursor.execute('DELETE FROM estoque_produtos')
-        cursor.execute('DELETE FROM formacao_precos')
-        cursor.execute('DELETE FROM estrutura_produto')
-        cursor.execute('DELETE FROM produtos')
-        cursor.execute('DELETE FROM materiais')
-        cursor.execute('DELETE FROM maquinas')
-        cursor.execute('DELETE FROM investimentos_imobiliarios')
-        cursor.execute('DELETE FROM requisicoes_compras')
-        cursor.execute('DELETE FROM configuracao_equipe') # Limpa configuração anterior
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute('DELETE FROM ordens_processo')
+    cursor.execute('DELETE FROM pedidos_vendas')
+    cursor.execute('DELETE FROM estoque_produtos')
+    cursor.execute('DELETE FROM formacao_precos')
+    cursor.execute('DELETE FROM estrutura_produto')
+    cursor.execute('DELETE FROM produtos')
+    cursor.execute('DELETE FROM materiais')
+    cursor.execute('DELETE FROM maquinas')
+    cursor.execute('DELETE FROM investimentos_imobiliarios')
+    cursor.execute('DELETE FROM requisicoes_compras')
+    conn.commit()
+    conn.close()
     
-    # Recria a estrutura básica e injeta catálogos padrões
     init_db()
     
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        # Grava na nova tabela persistindo o nome oficial desta rodada
-        cursor.execute(f'''
-            INSERT INTO configuracao_equipe (nome_equipe, aporte_inicial)
-            VALUES ({param}, {param})
-        ''', (nome_empresa, capital_inicial))
-        
-        # Alimenta a tabela imobiliária usando as variáveis coletadas da tela
-        cursor.execute(f'''
-            INSERT INTO investimentos_imobiliarios (turma_nome, city_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio)
-            VALUES ({param}, 'Não Definido', 'Não Definido', 0.0, 11.39, 0.0, 0.0, 0.0, {param})
-        ''', (nome_empresa, capital_inicial))
-        
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
-    
-    # Guarda o nome configurado na sessão atual para uso rápido no layout do cabeçalho
-    session['nome_empresa_simulada'] = nome_empresa
-    
-    flash(f'Simulador inicializado com sucesso para a equipe: {nome_empresa}!', 'success')
+    cursor.execute(f'''
+        INSERT INTO investimentos_imobiliarios (turma_nome, cidade_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio)
+        VALUES ({param}, 'Não Definido', 'Não Definido', 0.0, 11.39, 0.0, 0.0, 0.0, {param})
+    ''', (nome_empresa, capital_inicial))
+    conn.commit()
+    conn.close()
+    flash(f'Empresa {nome_empresa} inicializada com sucesso!', 'success')
     return redirect(url_for('estrutura'))
-
 @app.route('/professor_painel_secreto')
 def professor_painel():
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT id, usuario FROM usuarios')
-        todas_equipes = cursor.fetchall()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute('SELECT id, usuario FROM usuarios')
+    todas_equipes = cursor.fetchall()
+    conn.close()
     return render_template('professor.html', usuarios=todas_equipes)
 
 @app.route('/professor/resetar', methods=['POST'])
@@ -330,12 +238,9 @@ def professor_resetar():
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'UPDATE usuarios SET senha = {param} WHERE usuario = {param}', (novo_hash, user_aluno))
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'UPDATE usuarios SET senha = {param} WHERE usuario = {param}', (novo_hash, user_aluno))
+    conn.commit()
+    conn.close()
     flash(f"Mecanismo de Pânico: Senha de '{user_aluno}' alterada para '{nova_senha}'!", 'success')
     return redirect(url_for('professor_painel'))
 
@@ -355,9 +260,7 @@ def professor_cadastrar():
         flash(f"Equipe '{novo_user}' criada com sucesso!", 'success')
     except:
         flash("Erro: Esse nome de equipe já existe!", 'danger')
-    finally:
-        cursor.close()
-        conn.close()
+    conn.close()
     return redirect(url_for('professor_painel'))
 
 @app.route('/logout')
@@ -370,13 +273,10 @@ def estrutura():
     if not session.get('logado'): return redirect(url_for('index'))
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT * FROM investimentos_imobiliarios')
-        registros = cursor.fetchall()
-        caixa, total = calcular_caixa_disponivel(conn)
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute('SELECT * FROM investimentos_imobiliarios')
+    registros = cursor.fetchall()
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
     return render_template('estrutura.html', taxa_atual=11.39, registros=registros, caixa_disponivel=caixa, capital_inicial=total)
 
 @app.route('/salvar_estrutura', methods=['POST'])
@@ -387,26 +287,16 @@ def salvar_estrutura():
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        # Puxa o aporte inicial definido na tabela de configuração para travar o valor
-        cursor.execute('SELECT aporte_inicial FROM configuracao_equipe ORDER BY id DESC LIMIT 1')
-        config_registro = cursor.fetchone()
-        if config_registro:
-            # Resolve dinamicamente para SQLite ou PostgreSQL
-            capital_fixado = float(config_registro['aporte_inicial'] if (hasattr(config_registro, 'keys') or isinstance(config_registro, dict)) else config_registro[0])
-        else:
-            cursor.execute('SELECT capital_inicial_negocio FROM investimentos_imobiliarios ORDER BY id DESC LIMIT 1')
-            ultimo_registro = cursor.fetchone()
-            capital_fixado = float(ultimo_registro['capital_inicial_negocio'] if (hasattr(ultimo_registro, 'keys') or isinstance(ultimo_registro, dict)) else ultimo_registro[0]) if ultimo_registro else 0.0
-        
-        cursor.execute(f'''
-            INSERT INTO investimentos_imobiliarios (turma_nome, cidade_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio) 
-            VALUES ({param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param})
-        ''', (request.form.get('turma_nome', 'Grupo Geral'), request.form.get('cidade_regiao', 'Curitiba'), request.form.get('bairro_imovel', 'Centro'), float(request.form.get('area_imovel') or 0), float(request.form.get('taxa_selic') or 11.39), float(request.form.get('valor_imovel_estimado') or 0), float(request.form.get('aluguel_regional') or 0), float(request.form.get('perc_acionistas') or 0), capital_fixado))
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute('SELECT capital_inicial_negocio FROM investimentos_imobiliarios ORDER BY id DESC LIMIT 1')
+    ultimo_registro = cursor.fetchone()
+    capital_fixado = float(ultimo_registro['capital_inicial_negocio'] if ultimo_registro else 0.0)
+    
+    cursor.execute(f'''
+        INSERT INTO investimentos_imobiliarios (turma_nome, cidade_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio) 
+        VALUES ({param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param})
+    ''', (request.form.get('turma_nome', 'Grupo Geral'), request.form.get('cidade_regiao', 'Curitiba'), request.form.get('bairro_imovel', 'Centro'), float(request.form.get('area_imovel') or 0), float(request.form.get('taxa_selic') or 11.39), float(request.form.get('valor_imovel_estimado') or 0), float(request.form.get('aluguel_regional') or 0), float(request.form.get('perc_acionistas') or 0), capital_fixado))
+    conn.commit()
+    conn.close()
     return redirect(url_for('estrutura'))
 
 @app.route('/alterar_estrutura/<int:id>', methods=['POST'])
@@ -417,18 +307,15 @@ def alterar_estrutura(id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'SELECT capital_inicial_negocio FROM investimentos_imobiliarios WHERE id={param}', (id,))
-        ultimo_registro = cursor.fetchone()
-        capital_fixado = float(ultimo_registro['capital_inicial_negocio'] if (hasattr(ultimo_registro, 'keys') or isinstance(ultimo_registro, dict)) else ultimo_registro[0]) if ultimo_registro else 0.0
-        
-        cursor.execute(f'''
-            UPDATE investimentos_imobiliarios SET turma_nome={param}, cidade_regiao={param}, bairro_imovel={param}, area_imovel={param}, taxa_selic={param}, valor_imovel_estimado={param}, aluguel_regional={param}, perc_acionistas={param}, capital_inicial_negocio={param} WHERE id={param}
-        ''', (request.form.get('turma_nome', 'Grupo Geral'), request.form.get('cidade_regiao', 'Curitiba'), request.form.get('bairro_imovel', 'Centro'), float(request.form.get('area_imovel') or 0), float(request.form.get('taxa_selic') or 11.39), float(request.form.get('valor_imovel_estimado') or 0), float(request.form.get('aluguel_regional') or 0), float(request.form.get('perc_acionistas') or 0), capital_fixado, id))
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'SELECT capital_inicial_negocio FROM investimentos_imobiliarios WHERE id={param}', (id,))
+    ultimo_registro = cursor.fetchone()
+    capital_fixado = float(ultimo_registro['capital_inicial_negocio'] if ultimo_registro else 0.0)
+    
+    cursor.execute(f'''
+        UPDATE investimentos_imobiliarios SET turma_nome={param}, cidade_regiao={param}, bairro_imovel={param}, area_imovel={param}, taxa_selic={param}, valor_imovel_estimado={param}, aluguel_regional={param}, perc_acionistas={param}, capital_inicial_negocio={param} WHERE id={param}
+    ''', (request.form.get('turma_nome', 'Grupo Geral'), request.form.get('cidade_regiao', 'Curitiba'), request.form.get('bairro_imovel', 'Centro'), float(request.form.get('area_imovel') or 0), float(request.form.get('taxa_selic') or 11.39), float(request.form.get('valor_imovel_estimado') or 0), float(request.form.get('aluguel_regional') or 0), float(request.form.get('perc_acionistas') or 0), capital_fixado, id))
+    conn.commit()
+    conn.close()
     return redirect(url_for('estrutura'))
 
 @app.route('/deletar_estrutura/<int:id>', methods=['POST'])
@@ -439,12 +326,9 @@ def deletar_estrutura(id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'DELETE FROM investimentos_imobiliarios WHERE id={param}', (id,))
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'DELETE FROM investimentos_imobiliarios WHERE id={param}', (id,))
+    conn.commit()
+    conn.close()
     return redirect(url_for('estrutura'))
 
 @app.route('/maquinas')
@@ -452,21 +336,19 @@ def maquinas():
     if not session.get('logado'): return redirect(url_for('index'))
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT * FROM maquinas')
-        m_dados = cursor.fetchall()
-        
-        cursor.execute('SELECT aluguel_regional FROM investimentos_imobiliarios ORDER BY id DESC LIMIT 1')
-        ult = cursor.fetchone()
-        
-        caixa, total = calcular_caixa_disponivel(conn)
-    finally:
-        cursor.close()
-        conn.close()
+    
+    cursor.execute('SELECT * FROM maquinas')
+    m_dados = cursor.fetchall()
+    
+    cursor.execute('SELECT aluguel_regional FROM investimentos_imobiliarios ORDER BY id DESC LIMIT 1')
+    ult = cursor.fetchone()
+    
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
     
     # Tratamento unificado de campos para SQLite e PostgreSQL
     if ult:
-        base = float(ult['aluguel_regional'] if (hasattr(ult, 'keys') or isinstance(ult, dict)) else ult[0])
+        base = float(ult['aluguel_regional'] if hasattr(ult, 'keys') or isinstance(ult, dict) else ult[0])
     else:
         base = 0.0
         
@@ -481,23 +363,20 @@ def salvar_maquina():
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'''
-            INSERT INTO maquinas (nome_equipamento, potencia, consumo_eletrico, velocidade, avanco, comprimento_max, diametro_max, frequencia_manutencao, horas_trabalhadas, preco_compra, depreciacao_mensal, valor_venda_final, custo_minuto_maquina, operador_nome, custo_minuto_operador, salario_base, valor_adicionais, turno_trabalho, dia_semana, vida_util_meses) 
-            VALUES ({param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param})
-        ''', (
-            request.form.get('nome_equipamento', 'Equipamento'), float(request.form.get('potencia') or 0), float(request.form.get('consumo_eletrico') or 0),
-            request.form.get('velocidade', 'N/A'), request.form.get('avanco', 'N/A'), float(request.form.get('comprimento_max') or 0),
-            float(request.form.get('diametro_max') or 0), int(request.form.get('frequencia_manutencao') or 500), int(request.form.get('horas_trabalhadas') or 0),
-            float(request.form.get('preco_compra') or 0), float(request.form.get('depreciacao_mensal') or 0), float(request.form.get('valor_venda_final') or 0),
-            float(request.form.get('custo_minuto_maquina') or 0), request.form.get('operador_nome', 'Posto Vago - Aguardando MOD'), float(request.form.get('custo_minuto_operador') or 0.0),
-            float(request.form.get('salario_base') or 0.0), float(request.form.get('valor_adicionais') or 0.0), request.form.get('turno', 'Diurno'),
-            request.form.get('dia_semana', 'Regular'), int(request.form.get('vida_util_meses') or 120)
-        ))
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'''
+        INSERT INTO maquinas (nome_equipamento, potencia, consumo_eletrico, velocidade, avanco, comprimento_max, diametro_max, frequencia_manutencao, horas_trabalhadas, preco_compra, depreciacao_mensal, valor_venda_final, custo_minuto_maquina, operador_nome, custo_minuto_operador, salario_base, valor_adicionais, turno_trabalho, dia_semana, vida_util_meses) 
+        VALUES ({param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param})
+    ''', (
+        request.form.get('nome_equipamento', 'Equipamento'), float(request.form.get('potencia') or 0), float(request.form.get('consumo_eletrico') or 0),
+        request.form.get('velocidade', 'N/A'), request.form.get('avanco', 'N/A'), float(request.form.get('comprimento_max') or 0),
+        float(request.form.get('diametro_max') or 0), int(request.form.get('frequencia_manutencao') or 500), int(request.form.get('horas_trabalhadas') or 0),
+        float(request.form.get('preco_compra') or 0), float(request.form.get('depreciacao_mensal') or 0), float(request.form.get('valor_venda_final') or 0),
+        float(request.form.get('custo_minuto_maquina') or 0), request.form.get('operador_nome', 'Posto Vago - Aguardando MOD'), float(request.form.get('custo_minuto_operador') or 0.0),
+        float(request.form.get('salario_base') or 0.0), float(request.form.get('valor_adicionais') or 0.0), request.form.get('turno', 'Diurno'),
+        request.form.get('dia_semana', 'Regular'), int(request.form.get('vida_util_meses') or 120)
+    ))
+    conn.commit()
+    conn.close()
     return redirect(url_for('maquinas'))
 
 @app.route('/alterar_maquina/<int:id>', methods=['POST'])
@@ -508,14 +387,11 @@ def alterar_maquina(id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'''
-            UPDATE maquinas SET nome_equipamento={param}, potencia={param}, consumo_eletrico={param}, velocidade={param}, avanco={param}, comprimento_max={param}, diametro_max={param}, frequencia_manutencao={param}, horas_trabalhadas={param}, preco_compra={param}, depreciacao_mensal={param}, valor_venda_final={param}, custo_minuto_maquina={param}, operador_nome={param}, custo_minuto_operador={param}, salario_base={param}, valor_adicionais={param}, turno_trabalho={param}, dia_semana={param}, vida_util_meses={param} WHERE id={param}
-        ''', (request.form.get('nome_equipamento', 'Equipamento'), float(request.form.get('potencia') or 0), float(request.form.get('consumo_eletrico') or 0), request.form.get('velocidade', 'N/A'), request.form.get('avanco', 'N/A'), float(request.form.get('comprimento_max') or 0), float(request.form.get('diametro_max') or 0), int(request.form.get('frequencia_manutencao') or 500), int(request.form.get('horas_trabalhadas') or 0), float(request.form.get('preco_compra') or 0), float(request.form.get('depreciacao_mensal') or 0), float(request.form.get('valor_venda_final') or 0), float(request.form.get('custo_minuto_maquina') or 0), request.form.get('operador_nome', 'Posto Vago - Aguardando MOD'), float(request.form.get('custo_minuto_operador') or 0.0), float(request.form.get('salario_base') or 0.0), float(request.form.get('valor_adicionais') or 0.0), request.form.get('turno', 'Diurno'), request.form.get('dia_semana', 'Regular'), int(request.form.get('vida_util_meses') or 120), id))
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'''
+        UPDATE maquinas SET nome_equipamento={param}, potencia={param}, consumo_eletrico={param}, velocidade={param}, avanco={param}, comprimento_max={param}, diametro_max={param}, frequencia_manutencao={param}, horas_trabalhadas={param}, preco_compra={param}, depreciacao_mensal={param}, valor_venda_final={param}, custo_minuto_maquina={param}, operador_nome={param}, custo_minuto_operador={param}, salario_base={param}, valor_adicionais={param}, turno_trabalho={param}, dia_semana={param}, vida_util_meses={param} WHERE id={param}
+    ''', (request.form.get('nome_equipamento', 'Equipamento'), float(request.form.get('potencia') or 0), float(request.form.get('consumo_eletrico') or 0), request.form.get('velocidade', 'N/A'), request.form.get('avanco', 'N/A'), float(request.form.get('comprimento_max') or 0), float(request.form.get('diametro_max') or 0), int(request.form.get('frequencia_manutencao') or 500), int(request.form.get('horas_trabalhadas') or 0), float(request.form.get('preco_compra') or 0), float(request.form.get('depreciacao_mensal') or 0), float(request.form.get('valor_venda_final') or 0), float(request.form.get('custo_minuto_maquina') or 0), request.form.get('operador_nome', 'Posto Vago - Aguardando MOD'), float(request.form.get('custo_minuto_operador') or 0.0), float(request.form.get('salario_base') or 0.0), float(request.form.get('valor_adicionais') or 0.0), request.form.get('turno', 'Diurno'), request.form.get('dia_semana', 'Regular'), int(request.form.get('vida_util_meses') or 120), id))
+    conn.commit()
+    conn.close()
     return redirect(url_for('maquinas'))
 
 @app.route('/deletar_maquina/<int:id>', methods=['POST'])
@@ -526,12 +402,9 @@ def deletar_maquina(id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'DELETE FROM maquinas WHERE id={param}', (id,))
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'DELETE FROM maquinas WHERE id={param}', (id,))
+    conn.commit()
+    conn.close()
     return redirect(url_for('maquinas'))
 
 @app.route('/rh')
@@ -539,13 +412,10 @@ def rh():
     if not session.get('logado'): return redirect(url_for('index'))
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT * FROM maquinas WHERE operador_nome != 'Posto Vago - Aguardando MOD' AND operador_nome != ''")
-        colaboradores = cursor.fetchall()
-        caixa, total = calcular_caixa_disponivel(conn)
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute("SELECT * FROM maquinas WHERE operador_nome != 'Posto Vago - Aguardando MOD' AND operador_nome != ''")
+    colaboradores = cursor.fetchall()
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
     return render_template('rh.html', colaboradores=colaboradores, caixa_disponivel=caixa, capital_inicial=total)
 
 @app.route('/salvar_colaborador', methods=['POST'])
@@ -556,23 +426,19 @@ def salvar_colaborador():
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT id FROM maquinas WHERE operador_nome = 'Posto Vago - Aguardando MOD' LIMIT 1")
-        posto_vago = cursor.fetchone()
-        
-        if posto_vago:
-            # Tratamento unificado para leitura de ID em SQLite e PostgreSQL
-            vago_id = posto_vago['id'] if (hasattr(posto_vago, 'keys') or isinstance(posto_vago, dict)) else posto_vago[0]
-            cursor.execute(f'UPDATE maquinas SET operador_nome={param}, salario_base={param}, valor_adicionais={param}, turno_trabalho={param}, dia_semana={param}, custo_minuto_operador={param} WHERE id={param}', (request.form.get('nome_completo', 'Colaborador'), float(request.form.get('salario_base') or 0), float(request.form.get('valor_adicionais') or 0), request.form.get('turno', 'Diurno'), request.form.get('dia_semana', 'Regular'), float(request.form.get('custo_minuto_operador') or 0), vago_id))
-            conn.commit()
-            flash('MOD Alocado com sucesso!', 'success')
-        else:
-            cursor.execute(f"INSERT INTO maquinas (nome_equipamento, potencia, consumo_eletrico, velocidade, avanco, comprimento_max, diametro_max, frequencia_manutencao, horas_trabalhadas, preco_compra, depreciacao_mensal, valor_venda_final, custo_minuto_maquina, operador_nome, custo_minuto_operador, salario_base, valor_adicionais, turno_trabalho, dia_semana) VALUES ('Posto de Apoio / Indireto', 0, 0, 'N/A', 'N/A', 0, 0, 9999, 0, 0, 0, 0, 0, {param}, {param}, {param}, {param}, {param}, {param})", (request.form.get('nome_completo', 'Colaborador'), float(request.form.get('custo_minuto_operador') or 0), float(request.form.get('salario_base') or 0), float(request.form.get('valor_adicionais') or 0), request.form.get('turno', 'Diurno'), request.form.get('dia_semana', 'Regular')))
-            conn.commit()
-            flash('Mão de Obra Indireta alocada.', 'success')
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute("SELECT id FROM maquinas WHERE operador_nome = 'Posto Vago - Aguardando MOD' LIMIT 1")
+    posto_vago = cursor.fetchone()
+    
+    if posto_vago:
+        vago_id = posto_vago[0] if isinstance(posto_vago, tuple) else posto_vago['id']
+        cursor.execute(f'UPDATE maquinas SET operador_nome={param}, salario_base={param}, valor_adicionais={param}, turno_trabalho={param}, dia_semana={param}, custo_minuto_operador={param} WHERE id={param}', (request.form.get('nome_completo', 'Colaborador'), float(request.form.get('salario_base') or 0), float(request.form.get('valor_adicionais') or 0), request.form.get('turno', 'Diurno'), request.form.get('dia_semana', 'Regular'), float(request.form.get('custo_minuto_operador') or 0), vago_id))
+        conn.commit()
+        flash('MOD Alocado com sucesso!', 'success')
+    else:
+        cursor.execute(f"INSERT INTO maquinas (nome_equipamento, potencia, consumo_eletrico, velocidade, avanco, comprimento_max, diametro_max, frequencia_manutencao, horas_trabalhadas, preco_compra, depreciacao_mensal, valor_venda_final, custo_minuto_maquina, operador_nome, custo_minuto_operador, salario_base, valor_adicionais, turno_trabalho, dia_semana) VALUES ('Posto de Apoio / Indireto', 0, 0, 'N/A', 'N/A', 0, 0, 9999, 0, 0, 0, 0, 0, {param}, {param}, {param}, {param}, {param}, {param})", (request.form.get('nome_completo', 'Colaborador'), float(request.form.get('custo_minuto_operador') or 0), float(request.form.get('salario_base') or 0), float(request.form.get('valor_adicionais') or 0), request.form.get('turno', 'Diurno'), request.form.get('dia_semana', 'Regular')))
+        conn.commit()
+        flash('Mão de Obra Indireta alocada.', 'success')
+    conn.close()
     return redirect(url_for('rh'))
 
 @app.route('/imprimir_holerite/<int:id>/<string:tipo>')
@@ -583,32 +449,17 @@ def imprimir_holerite(id, tipo):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'SELECT * FROM maquinas WHERE id = {param}', (id,))
-        col = cursor.fetchone()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'SELECT * FROM maquinas WHERE id = {param}', (id,))
+    col = cursor.fetchone()
+    conn.close()
     
-    if not col: return "Colaborador não localizado."
-    
-    # Tratamento genérico para ler campos tanto de dicionário/Row quanto de Tupla pura
-    nome_operador = col['operador_nome'] if (hasattr(col, 'keys') or isinstance(col, dict)) else col[14]
-    id_colaborador = col['id'] if (hasattr(col, 'keys') or isinstance(col, dict)) else col[0]
-    salario_base_bruto = col['salario_base'] if (hasattr(col, 'keys') or isinstance(col, dict)) else col[16]
-    valor_adicionais_bruto = col['valor_adicionais'] if (hasattr(col, 'keys') or isinstance(col, dict)) else col[17]
-    dia_semana_tipo = col['dia_semana'] if (hasattr(col, 'keys') or isinstance(col, dict)) else col[19]
-    turno_trabalho_tipo = col['turno_trabalho'] if (hasattr(col, 'keys') or isinstance(col, dict)) else col[18]
-
-    if nome_operador == 'Posto Vago - Aguardando MOD': return "Colaborador não localizado."
-    
-    salario_base = float(salario_base_bruto or 0.0)
-    adicionais = float(valor_adicionais_bruto or 0.0)
-    horas_extras_acumuladas = 1250.00 if dia_semana_tipo != 'Regular' else 0.0
+    if not col or col['operador_nome'] == 'Posto Vago - Aguardando MOD': return "Colaborador não localizado."
+    salario_base = float(col['salario_base'] or 0.0)
+    adicionais = float(col['valor_adicionais'] or 0.0)
+    horas_extras_acumuladas = 1250.00 if col['dia_semana'] != 'Regular' else 0.0
     titulo_recibo = "RECIBO DE PAGAMENTO MENSAL"
     provento_principal_nome = "Salário Base Nominal"
     provento_principal_valor = salario_base
-    
     if tipo == "ferias":
         titulo_recibo = "RECIBO DE PAGAMENTO DE FÉRIAS (CLT)"
         provento_principal_nome = "Férias Integrais"
@@ -617,59 +468,80 @@ def imprimir_holerite(id, tipo):
         titulo_recibo = "RECIBO DE DÉCIMO TERCEIRO SALÁRIO"
         provento_principal_nome = "13º Salário Integral"
         provento_principal_valor = salario_base
-        
     total_proventos = provento_principal_valor + adicionais + horas_extras_acumuladas
     inss = total_proventos * 0.075 if total_proventos <= 1518.00 else ((total_proventos * 0.09) - 22.77 if total_proventos <= 2793.88 else ((total_proventos * 0.12) - 106.59 if total_proventos <= 4190.83 else ((total_proventos * 0.14) - 190.40 if total_proventos <= 8157.41 else 951.64)))
     base_irrf = total_proventos - inss
     irrf = 0.0 if base_irrf <= 2259.20 else ((base_irrf * 0.075) - 169.44 if base_irrf <= 2826.65 else ((base_irrf * 0.15) - 381.44 if base_irrf <= 3751.05 else ((base_irrf * 0.225) - 662.77 if base_irrf <= 4664.68 else (base_irrf * 0.275) - 896.00)))
-    vale_transporte = salario_base * 0.06 if turno_trabalho_tipo == 'Diurno' else 0.0
+    vale_transporte = salario_base * 0.06 if col['turno_trabalho'] == 'Diurno' else 0.0
     total_descontos = inss + irrf + vale_transporte
     valor_liquido = total_proventos - total_descontos
     
-    dados_holerite = {"tipo_recibo": titulo_recibo, "nome": nome_operador, "cargo": f"CBO {id_colaborador} - Ativo", "principal_nome": provento_principal_nome, "principal_valor": provento_principal_valor, "adicionais": adicionais, "he": horas_extras_acumuladas, "total_proventos": total_proventos, "inss": inss, "irrf": irrf, "vt": vale_transporte, "total_descontos": total_descontos, "liquido": valor_liquido}
+    # AJUSTE 1: Alterado de "horas_extras" para "he" para sincronizar com a linha 149 do seu HTML
+    dados_holerite = {"tipo_recibo": titulo_recibo, "nome": col['operador_nome'], "cargo": f"CBO {col['id']} - Ativo", "principal_nome": provento_principal_nome, "principal_valor": provento_principal_valor, "adicionais": adicionais, "he": horas_extras_acumuladas, "total_proventos": total_proventos, "inss": inss, "irrf": irrf, "vt": vale_transporte, "total_descontos": total_descontos, "liquido": valor_liquido}
     
+    # AJUSTE 2: Direcionado para o arquivo correto 'recibo_trabalhista.html' existente no seu GitHub
     return render_template('recibo_trabalhista.html', h=dados_holerite)
 
-@app.route('/rh')
-def rh():
+@app.route('/orcamentos')
+def orcamentos():
     if not session.get('logado'): return redirect(url_for('index'))
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT * FROM maquinas WHERE operador_nome != 'Posto Vago - Aguardando MOD' AND operador_nome != ''")
-        colaboradores = cursor.fetchall()
-        caixa, total = calcular_caixa_disponivel(conn)
-    finally:
-        cursor.close()
-        conn.close()
-    return render_template('rh.html', colaboradores=colaboradores, caixa_disponivel=caixa, capital_inicial=total)
+    cursor.execute('SELECT id, nome_equipamento, custo_minuto_maquina FROM maquinas')
+    maqs = cursor.fetchall()
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
+    return render_template('orcamentos.html', maquinas=maqs, caixa_disponivel=caixa, capital_inicial=total)
 
-@app.route('/salvar_colaborador', methods=['POST'])
-def salvar_colaborador():
+@app.route('/salvar_orcamento_calculado', methods=['POST'])
+def salvar_orcamento_calculado():
     if not session.get('logado'): return redirect(url_for('index'))
+    tipo = request.form.get('tipo_produto')
+    nome_item = request.form.get('nome_item')
+    lote = int(request.form.get('lote') or 1)
+    preco_final = float(request.form.get('preco_final_calculado') or 0.0)
+    sku = f"ORC-{tipo.upper()}-{int(preco_final)%1000}"
     conn = get_db_connection()
     is_postgres = not hasattr(conn, 'row_factory')
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT id FROM maquinas WHERE operador_nome = 'Posto Vago - Aguardando MOD' LIMIT 1")
-        posto_vago = cursor.fetchone()
+        cursor.execute(f'INSERT INTO produtos (codigo_produto, nome_produto) VALUES ({param}, {param})', (sku, nome_item))
+        cursor.execute(f'SELECT id FROM produtos WHERE codigo_produto = {param}', (sku,))
+        prod_id = cursor.fetchone()
+        p_id = prod_id if isinstance(prod_id, (int, float)) else (prod_id[0] if isinstance(prod_id, tuple) else prod_id['id'])
         
-        if posto_vago:
-            # Tratamento unificado para leitura de ID em SQLite e PostgreSQL
-            vago_id = posto_vago['id'] if (hasattr(posto_vago, 'keys') or isinstance(posto_vago, dict)) else posto_vago[0]
-            cursor.execute(f'UPDATE maquinas SET operador_nome={param}, salario_base={param}, valor_adicionais={param}, turno_trabalho={param}, dia_semana={param}, custo_minuto_operador={param} WHERE id={param}', (request.form.get('nome_completo', 'Colaborador'), float(request.form.get('salario_base') or 0), float(request.form.get('valor_adicionais') or 0), request.form.get('turno', 'Diurno'), request.form.get('dia_semana', 'Regular'), float(request.form.get('custo_minuto_operador') or 0), vago_id))
-            conn.commit()
-            flash('MOD Alocado com sucesso!', 'success')
-        else:
-            cursor.execute(f"INSERT INTO maquinas (nome_equipamento, potencia, consumo_eletrico, velocidade, avanco, comprimento_max, diametro_max, frequencia_manutencao, horas_trabalhadas, preco_compra, depreciacao_mensal, valor_venda_final, custo_minuto_maquina, operador_nome, custo_minuto_operador, salario_base, valor_adicionais, turno_trabalho, dia_semana) VALUES ('Posto de Apoio / Indireto', 0, 0, 'N/A', 'N/A', 0, 0, 9999, 0, 0, 0, 0, 0, {param}, {param}, {param}, {param}, {param}, {param})", (request.form.get('nome_completo', 'Colaborador'), float(request.form.get('custo_minuto_operador') or 0), float(request.form.get('salario_base') or 0), float(request.form.get('valor_adicionais') or 0), request.form.get('turno', 'Diurno'), request.form.get('dia_semana', 'Regular')))
-            conn.commit()
-            flash('Mão de Obra Indireta alocada.', 'success')
-    finally:
-        cursor.close()
-        conn.close()
-    return redirect(url_for('rh'))
+        cursor.execute(f'INSERT INTO formacao_precos (produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES ({param}, {param}, {param}, {param}, {param}, {param})', (p_id, float(request.form.get('iss') or 5), float(request.form.get('icms') or 18), float(request.form.get('federal') or 9.25), float(request.form.get('margem') or 25), preco_final / lote))
+        cursor.execute(f'INSERT INTO pedidos_vendas (produto_id, quantidade, desconto_percentual, observacoes) VALUES ({param}, {param}, 0, \'SOB ENCOMENDA - Fila PCP\')', (p_id, lote))
+        conn.commit()
+        flash('Orçamento integrado à carteira de demandas comerciais!', 'success')
+    except:
+        flash('Erro no processamento comercial.', 'danger')
+    conn.close()
+    return redirect(url_for('vendas'))
+
+@app.route('/requisicoes')
+def requisicoes():
+    if not session.get('logado'): return redirect(url_for('index'))
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM requisicoes_compras ORDER BY id DESC')
+    reqs = cursor.fetchall()
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
+    return render_template('requisicoes.html', requisicoes=reqs, caixa_disponivel=caixa, capital_inicial=total)
+
+@app.route('/compras')
+def compras():
+    if not session.get('logado'): return redirect(url_for('index'))
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM requisicoes_compras WHERE status LIKE 'Cotado%' ORDER BY id DESC")
+    cotadas = cursor.fetchall()
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
+    return render_template('compras.html', requisicoes_cotadas=cotadas, caixa_disponivel=caixa, capital_inicial=total)
 
 @app.route('/salvar_requisicao', methods=['POST'])
 def salvar_requisicao():
@@ -679,13 +551,9 @@ def salvar_requisicao():
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        # CORREÇÃO: Alterado de 'quantity' para 'quantidade' para bater com a estrutura do seu banco
-        cursor.execute(f'INSERT INTO requisicoes_compras (equipamento_tipo, especificacao_desejada, quantidade) VALUES ({param}, {param}, {param})', (request.form.get('equipamento_tipo', 'Equipamento'), request.form.get('especificacao_desejada', 'N/A'), int(request.form.get('quantidade') or 1)))
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'INSERT INTO requisicoes_compras (equipamento_tipo, especificacao_desejada, quantity) VALUES ({param}, {param}, {param})', (request.form.get('equipamento_tipo', 'Equipamento'), request.form.get('especificacao_desejada', 'N/A'), int(request.form.get('quantidade') or 1)))
+    conn.commit()
+    conn.close()
     return redirect(url_for('requisicoes'))
 
 @app.route('/cotar_internet/<int:id>', methods=['POST'])
@@ -696,28 +564,22 @@ def cotar_internet(id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'SELECT * FROM requisicoes_compras WHERE id = {param}', (id,))
-        req = cursor.fetchone()
+    cursor.execute(f'SELECT * FROM requisicoes_compras WHERE id = {param}', (id,))
+    req = cursor.fetchone()
+    
+    if req:
+        tipo = req['equipamento_tipo'].lower()
+        esp = req['especificacao_desejada'].lower()
+        preco, pot, dep = 45000.0, 5.5, 375.0
+        if 'torno' in tipo or 'cnc' in tipo or 'centro' in tipo: preco, pot, dep = (620000.0, 35.0, 5100.0) if '5 eixos' in esp else (290000.0, 18.0, 2400.0)
+        elif 'forno' in tipo: preco, pot, dep = (180000.0, 45.0, 1500.0)
+        elif 'prensa' in tipo: preco, pot, dep = (220000.0, 22.0, 1800.0)
+        elif 'solda' in tipo: preco, pot, dep = (15000.0, 7.5, 125.0)
+        elif 'material' in tipo or 'insumo' in tipo: preco, pot, dep = (2500.0 if 'tubo' in esp else 850.0), 0.0, 0.0
         
-        if req:
-            tipo_equipamento = req['equipamento_tipo'] if (hasattr(req, 'keys') or isinstance(req, dict)) else req[1]
-            especificacao = req['especificacao_desejada'] if (hasattr(req, 'keys') or isinstance(req, dict)) else req[2]
-            
-            tipo = tipo_equipamento.lower()
-            esp = especificacao.lower()
-            preco, pot, dep = 45000.0, 5.5, 375.0
-            if 'torno' in tipo or 'cnc' in tipo or 'centro' in tipo: preco, pot, dep = (620000.0, 35.0, 5100.0) if '5 eixos' in esp else (290000.0, 18.0, 2400.0)
-            elif 'forno' in tipo: preco, pot, dep = (180000.0, 45.0, 1500.0)
-            elif 'prensa' in tipo: preco, pot, dep = (220000.0, 22.0, 1800.0)
-            elif 'solda' in tipo: preco, pot, dep = (15000.0, 7.5, 125.0)
-            elif 'material' in tipo or 'insumo' in tipo: preco, pot, dep = (2500.0 if 'tubo' in esp else 850.0), 0.0, 0.0
-            
-            cursor.execute(f'UPDATE requisicoes_compras SET preco_cotado={param}, potencia_cotada={param}, depreciacao_sugerida={param}, status=\'Cotado - Aguardando Confirmação\' WHERE id={param}', (preco, pot, dep, id))
-            conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+        cursor.execute(f'UPDATE requisicoes_compras SET preco_cotado={param}, potencia_cotada={param}, depreciacao_sugerida={param}, status=\'Cotado - Aguardando Confirmação\' WHERE id={param}', (preco, pot, dep, id))
+        conn.commit()
+    conn.close()
     return redirect(url_for('requisicoes'))
 
 @app.route('/efetivar_compra/<int:id>', methods=['POST'])
@@ -728,49 +590,33 @@ def efetivar_compra(id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'SELECT * FROM requisicoes_compras WHERE id = {param}', (id,))
-        req = cursor.fetchone()
-        
-        cursor.execute('SELECT aluguel_regional FROM investimentos_imobiliarios ORDER BY id DESC LIMIT 1')
-        ult_imovel = cursor.fetchone()
-        
-        # Tratamento genérico para ler tupla ou dicionário
-        if ult_imovel:
-            aluguel_mensal = float(ult_imovel['aluguel_regional'] if (hasattr(ult_imovel, 'keys') or isinstance(ult_imovel, dict)) else ult_imovel[0])
+    cursor.execute(f'SELECT * FROM requisicoes_compras WHERE id = {param}', (id,))
+    req = cursor.fetchone()
+    
+    cursor.execute('SELECT aluguel_regional FROM investimentos_imobiliarios ORDER BY id DESC LIMIT 1')
+    ult_imovel = cursor.fetchone()
+    aluguel_mensal = float(ult_imovel['aluguel_regional'] if ult_imovel else 0.0)
+    
+    minutos_operacionais = 44 * 4.33 * 60
+    custo_aluguel_minuto = aluguel_mensal / minutos_operacionais
+    
+    if req:
+        preco = float(request.form.get('preco_final') or 0.0)
+        pot = float(request.form.get('potencia_final') or 0.0)
+        dep = float(request.form.get('depreciacao_final') or 0.0)
+        vida = int(request.form.get('vida_util_meses') or 120)
+        if "Máquina" in req['equipamento_tipo'] or "Ativo" in req['equipamento_tipo']:
+            c_mm = (dep / minutos_operacionais) + ((pot * 0.75) / 60) + custo_aluguel_minuto
+            cursor.execute(f'INSERT INTO maquinas (nome_equipamento, potencia, consumo_eletrico, velocidade, avanco, comprimento_max, diametro_max, frequencia_manutencao, horas_trabalhadas, preco_compra, depreciacao_mensal, valor_venda_final, custo_minuto_maquina, operador_nome, custo_minuto_operador, vida_util_meses) VALUES ({param}, {param}, {param}, \'3000\', \'15000\', 1000, 500, 1000, 0, {param}, {param}, {param}, {param}, \'Posto Vago - Aguardando MOD\', 0.0, {param})', (f"{req['especificacao_desejada']}", pot, pot * 0.7, preco, dep, preco * 0.2, c_mm, vida))
         else:
-            aluguel_mensal = 0.0
-        
-        minutos_operacionais = 44 * 4.33 * 60
-        custo_aluguel_minuto = aluguel_mensal / minutos_operacionais
-        
-        if req:
-            tipo_equipamento = req['equipamento_tipo'] if (hasattr(req, 'keys') or isinstance(req, dict)) else req[1]
-            especificacao = req['especificacao_desejada'] if (hasattr(req, 'keys') or isinstance(req, dict)) else req[2]
-            id_requisicao = req['id'] if (hasattr(req, 'keys') or isinstance(req, dict)) else req[0]
-            
-            preco = float(request.form.get('preco_final') or 0.0)
-            pot = float(request.form.get('potencia_final') or 0.0)
-            dep = float(request.form.get('depreciacao_final') or 0.0)
-            vida = int(request.form.get('vida_util_meses') or 120)
-            
-            # Captura a quantidade correta baseada no tipo de retorno
-            qtd = float(req['quantidade'] if (hasattr(req, 'keys') or isinstance(req, dict)) else req[3]) or 1.0
-            
-            if "Máquina" in tipo_equipamento or "Ativo" in tipo_equipamento:
-                c_mm = (dep / minutos_operacionais) + ((pot * 0.75) / 60) + custo_aluguel_minuto
-                cursor.execute(f'INSERT INTO maquinas (nome_equipamento, potencia, consumo_eletrico, velocidade, avanco, comprimento_max, diametro_max, frequencia_manutencao, horas_trabalhadas, preco_compra, depreciacao_mensal, valor_venda_final, custo_minuto_maquina, operador_nome, custo_minuto_operador, vida_util_meses) VALUES ({param}, {param}, {param}, \'3000\', \'15000\', 1000, 500, 1000, 0, {param}, {param}, {param}, {param}, \'Posto Vago - Aguardando MOD\', 0.0, {param})', (f"{especificacao}", pot, pot * 0.7, preco, dep, preco * 0.2, c_mm, vida))
+            sku_gerado = f"SKU-{req['id']}"
+            if is_postgres:
+                cursor.execute(f"INSERT INTO materiais (codigo_material, nome_material, preco_unidade, dimensoes, volume_disponivel) VALUES (%s, %s, %s, 'Lote', %s) ON CONFLICT (codigo_material) DO UPDATE SET volume_disponivel = materiais.volume_disponivel + EXCLUDED.volume_disponivel", (sku_gerado, req['especificacao_desejada'], preco/float(req['quantidade']), float(req['quantidade'])))
             else:
-                sku_gerado = f"SKU-{id_requisicao}"
-                if is_postgres:
-                    cursor.execute(f"INSERT INTO materiais (codigo_material, nome_material, preco_unidade, dimensoes, volume_disponivel) VALUES (%s, %s, %s, 'Lote', %s) ON CONFLICT (codigo_material) DO UPDATE SET volume_disponivel = materiais.volume_disponivel + EXCLUDED.volume_disponivel", (sku_gerado, especificacao, preco/qtd, qtd))
-                else:
-                    cursor.execute(f"INSERT OR REPLACE INTO materiais (codigo_material, nome_material, preco_unidade, dimensoes, volume_disponivel) VALUES (?, ?, ?, 'Lote', ?)", (sku_gerado, especificacao, preco/qtd, qtd))
-            cursor.execute(f"UPDATE requisicoes_compras SET status = 'Comprado e Ativado' WHERE id = {param}", (id,))
-            conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+                cursor.execute(f"INSERT OR REPLACE INTO materiais (codigo_material, nome_material, preco_unidade, dimensoes, volume_disponivel) VALUES (?, ?, ?, 'Lote', ?)", (sku_gerado, req['especificacao_desejada'], preco/float(req['quantidade']), float(req['quantidade'])))
+        cursor.execute(f"UPDATE requisicoes_compras SET status = 'Comprado e Ativado' WHERE id = {param}", (id,))
+        conn.commit()
+    conn.close()
     return redirect(url_for('requisicoes'))
 
 @app.route('/deletar_requisicao/<int:id>', methods=['POST'])
@@ -781,12 +627,9 @@ def deletar_requisicao(id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'DELETE FROM requisicoes_compras WHERE id={param}', (id,))
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'DELETE FROM requisicoes_compras WHERE id={param}', (id,))
+    conn.commit()
+    conn.close()
     return redirect(url_for('requisicoes'))
 
 @app.route('/inventario')
@@ -795,17 +638,15 @@ def materiais():
     if not session.get('logado'): return redirect(url_for('index'))
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT * FROM materiais')
-        mats = cursor.fetchall()
-        
-        cursor.execute('SELECT p.id, p.codigo_produto, p.nome_produto, COALESCE(ep.quantidade_disponivel, 0) AS quantidade_disponivel FROM produtos p LEFT JOIN estoque_produtos ep ON p.id = ep.produto_id')
-        itens_acabados = cursor.fetchall()
-        
-        caixa, total = calcular_caixa_disponivel(conn)
-    finally:
-        cursor.close()
-        conn.close()
+    
+    cursor.execute('SELECT * FROM materiais')
+    mats = cursor.fetchall()
+    
+    cursor.execute('SELECT p.id, p.codigo_produto, p.nome_produto, COALESCE(ep.quantidade_disponivel, 0) AS quantidade_disponivel FROM produtos p LEFT JOIN estoque_produtos ep ON p.id = ep.produto_id')
+    itens_acabados = cursor.fetchall()
+    
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
     return render_template('materiais.html', materiais=mats, estoque_itens=itens_acabados, caixa_disponivel=caixa, capital_inicial=total)
 
 @app.route('/salvar_material', methods=['POST'])
@@ -819,13 +660,10 @@ def salvar_material():
     try:
         cursor.execute(f'INSERT INTO materiais (codigo_material, nome_material, preco_unidade, dimensoes, volume_disponivel) VALUES ({param}, {param}, {param}, {param}, {param})', (request.form.get('codigo_material', 'SKU').strip(), request.form.get('nome_material', 'Insumo').strip(), float(request.form.get('preco_unidade') or 0), request.form.get('dimensoes', 'N/A'), float(request.form.get('volume_disponivel') or 0)))
         conn.commit()
-        flash('Material cadastrado com sucesso!', 'success')
-    except:
-        # OTIMIZAÇÃO PEDAGÓGICA: Evita tela branca de erro usando flash message
-        flash('Erro: Código de material (SKU) já existente no inventário!', 'danger')
-    finally:
-        cursor.close()
         conn.close()
+    except:
+        conn.close()
+        return "Erro: SKU duplicado!"
     return redirect(url_for('materiais'))
 
 @app.route('/alterar_material/<int:id>', methods=['POST'])
@@ -836,13 +674,9 @@ def alterar_material(id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'UPDATE materiais SET codigo_material={param}, nome_material={param}, preco_unidade={param}, dimensoes={param}, volume_disponivel={param} WHERE id={param}', (request.form.get('codigo_material', 'SKU').strip(), request.form.get('nome_material', 'Insumo').strip(), float(request.form.get('preco_unidade') or 0), request.form.get('dimensoes', 'N/A'), float(request.form.get('volume_disponivel') or 0), id))
-        conn.commit()
-        flash('Material updated com sucesso!', 'success')
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'UPDATE materiais SET codigo_material={param}, nome_material={param}, preco_unidade={param}, dimensoes={param}, volume_disponivel={param} WHERE id={param}', (request.form.get('codigo_material', 'SKU').strip(), request.form.get('nome_material', 'Insumo').strip(), float(request.form.get('preco_unidade') or 0), request.form.get('dimensoes', 'N/A'), float(request.form.get('volume_disponivel') or 0), id))
+    conn.commit()
+    conn.close()
     return redirect(url_for('materiais'))
 
 @app.route('/deletar_material/<int:id>', methods=['POST'])
@@ -853,13 +687,9 @@ def deletar_material(id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'DELETE FROM materiais WHERE id={param}', (id,))
-        conn.commit()
-        flash('Material removido do inventário!', 'success')
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'DELETE FROM materiais WHERE id={param}', (id,))
+    conn.commit()
+    conn.close()
     return redirect(url_for('materiais'))
 
 @app.route('/engenharia')
@@ -867,23 +697,21 @@ def engenharia():
     if not session.get('logado'): return redirect(url_for('index'))
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT * FROM produtos')
-        prods = cursor.fetchall()
-        
-        cursor.execute('SELECT id, nome_equipamento, custo_minuto_maquina FROM maquinas')
-        maqs = cursor.fetchall()
-        
-        cursor.execute('SELECT id, nome_material, preco_unidade FROM materiais')
-        mats = cursor.fetchall()
-        
-        cursor.execute('SELECT ep.*, p.nome_produto, p.codigo_produto, m.nome_equipamento, mat.nome_material FROM estrutura_produto ep JOIN produtos p ON ep.produto_id = p.id LEFT JOIN maquinas m ON ep.maquina_id = m.id LEFT JOIN materiais mat ON ep.material_id = mat.id')
-        comps = cursor.fetchall()
-        
-        caixa, total = calcular_caixa_disponivel(conn)
-    finally:
-        cursor.close()
-        conn.close()
+    
+    cursor.execute('SELECT * FROM produtos')
+    prods = cursor.fetchall()
+    
+    cursor.execute('SELECT id, nome_equipamento, custo_minuto_maquina FROM maquinas')
+    maqs = cursor.fetchall()
+    
+    cursor.execute('SELECT id, nome_material, preco_unidade FROM materiais')
+    mats = cursor.fetchall()
+    
+    cursor.execute('SELECT ep.*, p.nome_produto, p.codigo_produto, m.nome_equipamento, mat.nome_material FROM estrutura_produto ep JOIN produtos p ON ep.produto_id = p.id LEFT JOIN maquinas m ON ep.maquina_id = m.id LEFT JOIN materiais mat ON ep.material_id = mat.id')
+    comps = cursor.fetchall()
+    
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
     return render_template('engenharia.html', produtos=prods, maquinas=maqs, materiais=mats, composicoes=comps, caixa_disponivel=caixa, capital_inicial=total)
 
 @app.route('/salvar_produto', methods=['POST'])
@@ -897,13 +725,10 @@ def salvar_produto():
     try:
         cursor.execute(f'INSERT INTO produtos (codigo_produto, nome_produto) VALUES ({param}, {param})', (request.form.get('codigo_produto', 'PROD').strip(), request.form.get('nome_produto', 'Acabado').strip()))
         conn.commit()
-        flash('Novo produto mestre registrado na Engenharia!', 'success')
     except:
-        # OTIMIZAÇÃO PEDAGÓGICA: Evita tela branca de erro usando flash message
-        flash('Erro: Esse código de produto já está cadastrado na Engenharia!', 'danger')
-    finally:
-        cursor.close()
         conn.close()
+        return "Erro: Produto duplicado."
+    conn.close()
     return redirect(url_for('engenharia'))
 
 @app.route('/vincular_estrutura', methods=['POST'])
@@ -918,19 +743,13 @@ def vincular_estrutura():
     mat_id = int(material_id) if material_id and material_id.isdigit() else None
     
     cursor = conn.cursor()
-    try:
         # ADICIONE ESTA LINHA EXATAMENTE AQUI (Insere o produto mestre para não violar a chave estrangeira)
-        if is_postgres:
-            cursor.execute("INSERT INTO produtos (id, codigo_produto, nome_produto) VALUES (1, 'PROD001', 'Produto Base Acadêmico') ON CONFLICT (id) DO NOTHING")
-        else:
-            cursor.execute("INSERT OR IGNORE INTO produtos (id, codigo_produto, nome_produto) VALUES (1, 'PROD001', 'Produto Base Acadêmico')")
-        
-        # Linha que já existia no seu código adaptada para parametrização limpa:
-        cursor.execute(f"INSERT INTO estrutura_produto (produto_id, maquina_id, material_id, tempo_processo_min, quantidade_material) VALUES (1, {param}, {param}, 12.0, 1.5)", (m_id, mat_id))
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute("INSERT INTO produtos (id, codigo_produto, nome_produto) VALUES (1, 'PROD001', 'Produto Base Acadêmico') ON CONFLICT (id) DO NOTHING")
+    
+    # Linha que já existia no seu código:
+    cursor.execute(f"INSERT INTO estrutura_produto (produto_id, maquina_id, material_id, tempo_processo_min, quantidade_material) VALUES (1, 1, 2, 12.0, 1.5)")
+    conn.commit()
+    conn.close()
     return redirect(url_for('engenharia'))
 
 @app.route('/deletar_item_estrutura/<int:id>', methods=['POST'])
@@ -941,12 +760,9 @@ def deletar_item_estrutura(id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'DELETE FROM estrutura_produto WHERE id={param}', (id,))
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'DELETE FROM estrutura_produto WHERE id={param}', (id,))
+    conn.commit()
+    conn.close()
     return redirect(url_for('engenharia'))
 
 @app.route('/precificacao')
@@ -954,17 +770,15 @@ def precificacao():
     if not session.get('logado'): return redirect(url_for('index'))
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT p.id, p.codigo_produto, p.nome_produto, COALESCE(SUM(ep.tempo_processo_min * mq.custo_minuto_maquina), 0) + COALESCE(SUM(ep.quantidade_material * mt.preco_unidade), 0) AS custo_fabricacao FROM produtos p LEFT JOIN estrutura_produto ep ON p.id = ep.produto_id LEFT JOIN maquinas mq ON ep.maquina_id = mq.id LEFT JOIN materiais mt ON ep.material_id = mt.id GROUP BY p.id, p.codigo_produto, p.nome_produto')
-        prods = cursor.fetchall()
-        
-        cursor.execute('SELECT fp.*, p.codigo_produto, p.nome_produto FROM formacao_precos fp JOIN produtos p ON fp.produto_id = p.id')
-        salvos = cursor.fetchall()
-        
-        caixa, total = calcular_caixa_disponivel(conn)
-    finally:
-        cursor.close()
-        conn.close()
+    
+    cursor.execute('SELECT p.id, p.codigo_produto, p.nome_produto, COALESCE(SUM(ep.tempo_processo_min * mq.custo_minuto_maquina), 0) + COALESCE(SUM(ep.quantidade_material * mt.preco_unidade), 0) AS custo_fabricacao FROM produtos p LEFT JOIN estrutura_produto ep ON p.id = ep.produto_id LEFT JOIN maquinas mq ON ep.maquina_id = mq.id LEFT JOIN materiais mt ON ep.material_id = mt.id GROUP BY p.id, p.codigo_produto, p.nome_produto')
+    prods = cursor.fetchall()
+    
+    cursor.execute('SELECT fp.*, p.codigo_produto, p.nome_produto FROM formacao_precos fp JOIN produtos p ON fp.produto_id = p.id')
+    salvos = cursor.fetchall()
+    
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
     return render_template('precificacao.html', produtos=prods, precos_salvos=salvos, caixa_disponivel=caixa, capital_inicial=total)
 
 @app.route('/salvar_preco', methods=['POST'])
@@ -980,16 +794,12 @@ def salvar_preco():
     p_final = float(request.form.get('preco_venda_final') or 0)
     
     cursor = conn.cursor()
-    try:
-        if is_postgres:
-            cursor.execute(f'INSERT INTO formacao_precos (produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (produto_id) DO UPDATE SET imposto_municipal=EXCLUDED.imposto_municipal, imposto_estadual=EXCLUDED.imposto_estadual, imposto_federal=EXCLUDED.imposto_federal, margem_lucro=EXCLUDED.margem_lucro, preco_venda_final=EXCLUDED.preco_venda_final', (p_id, i_mun, i_est, i_fed, margem, p_final))
-        else:
-            cursor.execute(f'INSERT OR REPLACE INTO formacao_precos (produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES (?, ?, ?, ?, ?, ?)', (p_id, i_mun, i_est, i_fed, margem, p_final))
-        conn.commit()
-        flash('Preço de venda estruturado e salvo com sucesso!', 'success')
-    finally:
-        cursor.close()
-        conn.close()
+    if is_postgres:
+        cursor.execute(f'INSERT INTO formacao_precos (produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (produto_id) DO UPDATE SET imposto_municipal=EXCLUDED.imposto_municipal, imposto_estadual=EXCLUDED.imposto_estadual, imposto_federal=EXCLUDED.imposto_federal, margem_lucro=EXCLUDED.margem_lucro, preco_venda_final=EXCLUDED.preco_venda_final', (p_id, i_mun, i_est, i_fed, margem, p_final))
+    else:
+        cursor.execute(f'INSERT OR REPLACE INTO formacao_precos (produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES (?, ?, ?, ?, ?, ?)', (p_id, i_mun, i_est, i_fed, margem, p_final))
+    conn.commit()
+    conn.close()
     return redirect(url_for('precificacao'))
 
 @app.route('/vendas')
@@ -997,19 +807,15 @@ def vendas():
     if not session.get('logado'): return redirect(url_for('index'))
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        # OTIMIZAÇÃO PEDAGÓGICA: Mudado para LEFT JOIN na precificação para exibir produtos mesmo que não precificados
-        cursor.execute('SELECT p.id, p.codigo_produto, p.nome_produto, COALESCE(fp.preco_venda_final, 0.0) AS preco_venda_final, COALESCE(e.quantidade_disponivel, 0) AS estoque_atual FROM produtos p LEFT JOIN formacao_precos fp ON p.id = fp.produto_id LEFT JOIN estoque_produtos e ON p.id = e.produto_id')
-        prods = cursor.fetchall()
-        
-        # AJUSTE SEGURO: Utilizando LEFT JOIN em formacao_precos para listar pedidos mesmo se o preço do produto for alterado ou deletado
-        cursor.execute('SELECT pv.*, p.codigo_produto, p.nome_produto, COALESCE(fp.preco_venda_final, 0.0) AS preco_venda_final, COALESCE(fp.imposto_municipal, 0.0) AS imposto_municipal, COALESCE(fp.imposto_estadual, 0.0) AS imposto_estadual, COALESCE(fp.imposto_federal, 0.0) AS imposto_federal FROM pedidos_vendas pv JOIN produtos p ON pv.produto_id = p.id LEFT JOIN formacao_precos fp ON p.id = fp.produto_id ORDER BY pv.id DESC')
-        peds = cursor.fetchall()
-        
-        caixa, total = calcular_caixa_disponivel(conn)
-    finally:
-        cursor.close()
-        conn.close()
+    
+    cursor.execute('SELECT p.id, p.codigo_produto, p.nome_produto, fp.preco_venda_final, COALESCE(e.quantidade_disponivel, 0) AS estoque_atual FROM produtos p JOIN formacao_precos fp ON p.id = fp.produto_id LEFT JOIN estoque_produtos e ON p.id = e.produto_id')
+    prods = cursor.fetchall()
+    
+    cursor.execute('SELECT pv.*, p.codigo_produto, p.nome_produto, fp.preco_venda_final, fp.imposto_municipal, fp.imposto_estadual, fp.imposto_federal FROM pedidos_vendas pv JOIN produtos p ON pv.produto_id = p.id JOIN formacao_precos fp ON p.id = fp.produto_id ORDER BY pv.id DESC')
+    peds = cursor.fetchall()
+    
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
     return render_template('vendas.html', produtos=prods, pedidos=peds, caixa_disponivel=caixa, capital_inicial=total)
 
 @app.route('/estoque')
@@ -1017,17 +823,15 @@ def estoque():
     if not session.get('logado'): return redirect(url_for('index'))
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT p.id AS produto_id, p.codigo_produto, p.nome_produto, COALESCE(ep.quantidade_disponivel, 0) AS quantidade_disponivel FROM produtos p LEFT JOIN estoque_produtos ep ON p.id = ep.produto_id')
-        itens = cursor.fetchall()
-        
-        cursor.execute("SELECT pv.*, p.codigo_produto, p.nome_produto FROM pedidos_vendas pv JOIN produtos p ON pv.produto_id = p.id WHERE pv.observacoes LIKE '%SOB ENCOMENDA%'")
-        peds = cursor.fetchall()
-        
-        caixa, total = calcular_caixa_disponivel(conn)
-    finally:
-        cursor.close()
-        conn.close()
+    
+    cursor.execute('SELECT p.id AS produto_id, p.codigo_produto, p.nome_produto, COALESCE(ep.quantidade_disponivel, 0) AS quantidade_disponivel FROM produtos p LEFT JOIN estoque_produtos ep ON p.id = ep.produto_id')
+    itens = cursor.fetchall()
+    
+    cursor.execute("SELECT pv.*, p.codigo_produto, p.nome_produto FROM pedidos_vendas pv JOIN produtos p ON pv.produto_id = p.id WHERE pv.observacoes LIKE '%SOB ENCOMENDA%'")
+    peds = cursor.fetchall()
+    
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
     return render_template('estoque.html', estoque_itens=itens, pedidos=peds, caixa_disponivel=caixa, capital_inicial=total)
 
 @app.route('/lancar_venda', methods=['POST'])
@@ -1040,28 +844,23 @@ def lancar_venda():
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'SELECT quantidade_disponivel FROM estoque_produtos WHERE produto_id = {param}', (prod_id,))
-        est = cursor.fetchone()
+    cursor.execute(f'SELECT quantidade_disponivel FROM estoque_produtos WHERE produto_id = {param}', (prod_id,))
+    est = cursor.fetchone()
+    
+    if est:
+        estoque_atual = float(est['quantidade_disponivel'] if hasattr(est, 'keys') or isinstance(est, dict) else est[0])
+    else:
+        estoque_atual = 0.0
         
-        if est:
-            estoque_atual = float(est['quantidade_disponivel'] if (hasattr(est, 'keys') or isinstance(est, dict)) else est[0])
-        else:
-            estoque_atual = 0.0
-            
-        if estoque_atual >= qtd:
-            cursor.execute(f'UPDATE estoque_produtos SET quantidade_disponivel = quantidade_disponivel - {param} WHERE produto_id = {param}', (qtd, prod_id))
-            cursor.execute(f'INSERT INTO pedidos_vendas (produto_id, quantidade, desconto_percentual, observacoes) VALUES ({param}, {param}, 0, \'Pronta Entrega - Faturado\')', (prod_id, qtd))
-            flash('Venda realizada! Itens baixados do estoque e faturados.', 'success')
-        else:
-            # CORREÇÃO: Utilizando corretamente a coluna 'quantidade' do seu esquema de banco de dados
-            cursor.execute(f'INSERT INTO pedidos_vendas (produto_id, quantidade, desconto_percentual, observacoes) VALUES ({param}, {param}, 0, \'SOB ENCOMENDA - Fila PCP\')', (prod_id, qtd))
-            flash('Estoque insuficiente! Pedido registrado SOB ENCOMENDA e enviado ao PCP.', 'warning')
-            
-        conn.commit()
-    finally:
-        cursor.close()
-        conn.close()
+    if estoque_atual >= qtd:
+        cursor.execute(f'UPDATE estoque_produtos SET quantidade_disponivel = quantidade_disponivel - {param} WHERE produto_id = {param}', (qtd, prod_id))
+        cursor.execute(f'INSERT INTO pedidos_vendas (produto_id, quantidade, desconto_percentual, observacoes) VALUES ({param}, {param}, 0, \'Pronta Entrega - Faturado\')', (prod_id, qtd))
+    else:
+        # CORREÇÃO: Alterado 'quantity' para 'quantidade' para bater com o esquema do banco de dados
+        cursor.execute(f'INSERT INTO pedidos_vendas (produto_id, quantidade, desconto_percentual, observacoes) VALUES ({param}, {param}, 0, \'SOB ENCOMENDA - Fila PCP\')', (prod_id, qtd))
+        
+    conn.commit()
+    conn.close()
     return redirect(url_for('vendas'))
 
 @app.route('/deletar_venda/<int:id>', methods=['POST'])
@@ -1072,27 +871,19 @@ def deletar_venda(id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'DELETE FROM pedidos_vendas WHERE id={param}', (id,))
-        conn.commit()
-        flash('Pedido de venda removido do sistema.', 'success')
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'DELETE FROM pedidos_vendas WHERE id={param}', (id,))
+    conn.commit()
+    conn.close()
     return redirect(url_for('vendas'))
-
 @app.route('/pcp')
 def pcp():
     if not session.get('logado'): return redirect(url_for('index'))
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT * FROM ordens_processo ORDER BY pedido_id ASC, id ASC')
-        ords = cursor.fetchall()
-        caixa, total = calcular_caixa_disponivel(conn)
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute('SELECT * FROM ordens_processo ORDER BY pedido_id ASC, id ASC')
+    ords = cursor.fetchall()
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
     return render_template('pcp.html', ordens=ords, caixa_disponivel=caixa, capital_inicial=total)
 
 @app.route('/solicitar_producao_pcp/<int:pedido_id>', methods=['POST'])
@@ -1103,48 +894,36 @@ def solicitar_producao_pcp(pedido_id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'SELECT id FROM ordens_processo WHERE pedido_id = {param}', (pedido_id,))
-        existe = cursor.fetchone()
+    cursor.execute(f'SELECT id FROM ordens_processo WHERE pedido_id = {param}', (pedido_id,))
+    existe = cursor.fetchone()
+    
+    if not existe:
+        cursor.execute(f'SELECT pv.*, p.codigo_produto, p.nome_produto FROM pedidos_vendas pv JOIN produtos p ON pv.produto_id = p.id WHERE pv.id = {param}', (pedido_id,))
+        ped = cursor.fetchone()
         
-        if not existe:
-            cursor.execute(f'SELECT pv.*, p.codigo_produto, p.nome_produto FROM pedidos_vendas pv JOIN produtos p ON pv.produto_id = p.id WHERE pv.id = {param}', (pedido_id,))
-            ped = cursor.fetchone()
+        if ped:
+            p_id = int(ped['produto_id'] if hasattr(ped, 'keys') or isinstance(ped, dict) else ped)
+            p_qtd = int(ped['quantidade'] if hasattr(ped, 'keys') or isinstance(ped, dict) else ped)
+            p_cod = ped['codigo_produto'] if hasattr(ped, 'keys') or isinstance(ped, dict) else ped
+            p_nome = ped['nome_produto'] if hasattr(ped, 'keys') or isinstance(ped, dict) else ped
             
-            if ped:
-                is_dict_ped = hasattr(ped, 'keys') or isinstance(ped, dict)
-                p_id = int(ped['produto_id'] if is_dict_ped else ped[1]) # índice baseado no SELECT pv.* (ajustado de forma segura)
-                p_qtd = int(ped['quantidade'] if is_dict_ped else ped[2])
-                p_cod = ped['codigo_produto'] if is_dict_ped else ped[4]
-                p_nome = ped['nome_produto'] if is_dict_ped else ped[5]
+            cursor.execute(f'SELECT ep.*, m.nome_equipamento, m.custo_minuto_maquina, m.operador_nome FROM estrutura_produto ep LEFT JOIN maquinas m ON ep.maquina_id = m.id WHERE ep.produto_id = {param} ORDER BY ep.id ASC', (p_id,))
+            rots = cursor.fetchall()
+            
+            ponteiro_tempo = datetime.datetime.now()
+            tempo_setup_fixo = 15
+            for idx, r in enumerate(rots):
+                tempo_lote_min = (float(r['tempo_processo_min'] or 0) * p_qtd) + tempo_setup_fixo
+                custo_total_operacao = tempo_lote_min * float(r['custo_minuto_maquina'] or 0.15)
+                status_inicial = "Na Fila [GARGALO OPERACIONAL]" if tempo_lote_min > 480 else "Na Fila"
+                entrada_str = ponteiro_tempo.strftime("%d/%m/%Y %H:%M")
+                ponteiro_tempo = ponteiro_tempo + datetime.timedelta(minutes=tempo_lote_min)
+                saida_str = ponteiro_tempo.strftime("%d/%m/%Y %H:%M")
                 
-                cursor.execute(f'SELECT ep.*, m.nome_equipamento, m.custo_minuto_maquina, m.operador_nome FROM estrutura_produto ep LEFT JOIN maquinas m ON ep.maquina_id = m.id WHERE ep.produto_id = {param} ORDER BY ep.id ASC', (p_id,))
-                rots = cursor.fetchall()
-                
-                ponteiro_tempo = datetime.datetime.now()
-                tempo_setup_fixo = 15
-                for idx, r in enumerate(rots):
-                    is_dict_r = hasattr(r, 'keys') or isinstance(r, dict)
-                    
-                    # Tratamento robusto para evitar quebras por tipo de dados (Tupla vs Dicionário)
-                    t_proc = float((r['tempo_processo_min'] if is_dict_r else r[4]) or 0)
-                    c_maq = float((r['custo_minuto_maquina'] if is_dict_r else r[7]) or 0.15)
-                    n_maq = (r['nome_equipamento'] if is_dict_r else r[6]) or 'Bancada Manual'
-                    n_op = (r['operador_nome'] if is_dict_r else r[8]) or 'Pendente'
-                    
-                    tempo_lote_min = (t_proc * p_qtd) + tempo_setup_fixo
-                    custo_total_operacao = tempo_lote_min * c_maq
-                    status_inicial = "Na Fila [GARGALO OPERACIONAL]" if tempo_lote_min > 480 else "Na Fila"
-                    entrada_str = ponteiro_tempo.strftime("%d/%m/%Y %H:%M")
-                    ponteiro_tempo = ponteiro_tempo + datetime.timedelta(minutes=tempo_lote_min)
-                    saida_str = ponteiro_tempo.strftime("%d/%m/%Y %H:%M")
-                    
-                    cursor.execute(f'INSERT INTO ordens_processo (pedido_id, numero_operacao, maquina_name, codigo_produto, nome_produto, data_entrada, tempo_estimado_min, data_saida, status, custo_operacao, operador_nome) VALUES ({param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param})', (pedido_id, f"OP {(idx+1)*10}", n_maq, p_cod, p_nome, entrada_str, tempo_lote_min, saida_str, status_inicial, custo_total_operacao, n_op))
-                conn.commit()
-            flash('Ordem de Produção transmitida com sucesso para o painel do PCP!', 'success')
-    finally:
-        cursor.close()
-        conn.close()
+                cursor.execute(f'INSERT INTO ordens_processo (pedido_id, numero_operacao, maquina_name, codigo_produto, nome_produto, data_entrada, tempo_estimado_min, data_saida, status, custo_operacao, operador_nome) VALUES ({param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param})', (pedido_id, f"OP {(idx+1)*10}", r['nome_equipamento'] or 'Bancada Manual', p_cod, p_nome, entrada_str, tempo_lote_min, saida_str, status_inicial, custo_total_operacao, r['operador_nome'] or 'Pendente'))
+            conn.commit()
+        flash('Ordem de Produção transmitida com sucesso para o painel do PCP!', 'success')
+    conn.close()
     return redirect(url_for('estoque'))
 
 @app.route('/abastecer_estoque_pcp', methods=['POST'])
@@ -1158,34 +937,35 @@ def abastecer_estoque_pcp():
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'SELECT COUNT(*) FROM ordens_processo WHERE pedido_id = {param}', (pedido_id,))
-        row_ext = cursor.fetchone()
-        ops_existentes = int(row_ext[0]) if row_ext else 0
-        
-        status_like = 'Finalizado%'
-        cursor.execute(f'SELECT COUNT(*) FROM ordens_processo WHERE pedido_id = {param} AND status NOT LIKE {param}', (pedido_id, status_like))
-        row_pend = cursor.fetchone()
-        ops_pendentes = int(row_pend[0]) if row_pend else 0
-        
-        if ops_existentes == 0 or ops_pendentes > 0:
-            flash('Bloqueio de Qualidade: O Almoxarifado não pode receber este lote! Existem operações pendentes no PCP.', 'danger')
-            return redirect(url_for('estoque'))
-            
-        cursor.execute(f'SELECT * FROM estoque_produtos WHERE produto_id = {param}', (prod_id,))
-        est = cursor.fetchone()
-        
-        if not est: 
-            cursor.execute(f'INSERT INTO estoque_produtos (produto_id, quantidade_disponivel) VALUES ({param}, {param})', (prod_id, qtd))
-        else: 
-            cursor.execute(f'UPDATE estoque_produtos SET quantidade_disponivel = quantidade_disponivel + {param} WHERE produto_id = {param}', (qtd, prod_id))
-            
-        cursor.execute(f'UPDATE ordens_processo SET status = \'Finalizado e Armazenado\' WHERE pedido_id = {param}', (pedido_id,))
-        conn.commit()
-        flash('Recebimento efetuado e integrado com sucesso ao estoque disponível.', 'success')
-    finally:
-        cursor.close()
+    cursor.execute(f'SELECT COUNT(*) FROM ordens_processo WHERE pedido_id = {param}', (pedido_id,))
+    row_ext = cursor.fetchone()
+    
+    # Tratamento seguro para DictRow e Tuplas extraindo o primeiro elemento
+    ops_existentes = int(row_ext[0]) if row_ext else 0
+    
+    # Passando o valor do LIKE com o símbolo de porcentagem de forma segura como parâmetro
+    status_like = 'Finalizado%'
+    cursor.execute(f'SELECT COUNT(*) FROM ordens_processo WHERE pedido_id = {param} AND status NOT LIKE {param}', (pedido_id, status_like))
+    row_pend = cursor.fetchone()
+    ops_pendentes = int(row_pend[0]) if row_pend else 0
+    
+    if ops_existentes == 0 or ops_pendentes > 0:
         conn.close()
+        flash('Bloqueio de Qualidade: O Almoxarifado não pode receber este lote! Existem operações pendentes no PCP.', 'danger')
+        return redirect(url_for('estoque'))
+        
+    cursor.execute(f'SELECT * FROM estoque_produtos WHERE produto_id = {param}', (prod_id,))
+    est = cursor.fetchone()
+    
+    if not est: 
+        cursor.execute(f'INSERT INTO estoque_produtos (produto_id, quantidade_disponivel) VALUES ({param}, {param})', (prod_id, qtd))
+    else: 
+        cursor.execute(f'UPDATE estoque_produtos SET quantidade_disponivel = quantidade_disponivel + {param} WHERE produto_id = {param}', (qtd, prod_id))
+        
+    cursor.execute(f'UPDATE ordens_processo SET status = \'Finalizado e Armazenado\' WHERE pedido_id = {param}', (pedido_id,))
+    conn.commit()
+    conn.close()
+    flash('Recebimento efetuado e integrado com sucesso ao estoque disponível.', 'success')
     return redirect(url_for('estoque'))
 
 @app.route('/dar_baixa_op/<int:id>', methods=['POST'])
@@ -1196,16 +976,10 @@ def dar_baixa_op(id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        # Limpeza de sintaxe na formatação dos parâmetros SQL
-        cursor.execute(f"UPDATE ordens_processo SET operador_nome = {param}, status = 'Finalizado' WHERE id = {param}", (request.form.get('operador_nome', 'Operador'), id))
-        conn.commit()
-        flash('Operação finalizada com sucesso no painel do PCP!', 'success')
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute( f"UPDATE ordens_processo SET operador_nome = { param}, status = 'Finalizado' WHERE id = { param}", ( request.form.get('operador_nome', 'Operador'), id))
+    conn.commit()
+    conn.close()
     return redirect(url_for('pcp'))
-
 @app.route('/imprimir_nf/<int:pedido_id>')
 def imprimir_nf(pedido_id):
     if not session.get('logado'): return redirect(url_for('index'))
@@ -1214,23 +988,18 @@ def imprimir_nf(pedido_id):
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'SELECT pv.quantidade, pv.desconto_percentual, fp.preco_venda_final, fp.imposto_municipal, fp.imposto_estadual, fp.imposto_federal, p.codigo_produto, p.nome_produto FROM pedidos_vendas pv JOIN produtos p ON pv.produto_id = p.id JOIN formacao_precos fp ON p.id = fp.produto_id WHERE pv.id = {param}', (pedido_id,))
-        ped = cursor.fetchone()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'SELECT pv.*, p.codigo_produto, p.nome_produto, fp.preco_venda_final, fp.imposto_municipal, fp.imposto_estadual, fp.imposto_federal FROM pedidos_vendas pv JOIN produtos p ON pv.produto_id = p.id JOIN formacao_precos fp ON p.id = fp.produto_id WHERE pv.id = {param}', (pedido_id,))
+    ped = cursor.fetchone()
+    conn.close()
     
     if not ped: return "Nota Fiscal não encontrada."
     
-    # Tratamento unificado definitivo para tuplas posicionais controladas e dicionários de dados
-    is_dict = hasattr(ped, 'keys') or isinstance(ped, dict)
-    p_qtd = int(ped['quantidade'] if is_dict else ped[0])
-    p_desc = float(ped['desconto_percentual'] if is_dict else ped[1])
-    pf_venda = float(ped['preco_venda_final'] if is_dict else ped[2])
-    i_mun = float(ped['imposto_municipal'] if is_dict else ped[3])
-    i_est = float(ped['imposto_estadual'] if is_dict else ped[4])
-    i_fed = float(ped['imposto_federal'] if is_dict else ped[5])
+    p_qtd = int(ped['quantidade'] if hasattr(ped, 'keys') or isinstance(ped, dict) else ped[2])
+    p_desc = float(ped['desconto_percentual'] if hasattr(ped, 'keys') or isinstance(ped, dict) else ped[3])
+    pf_venda = float(ped['preco_venda_final'] if hasattr(ped, 'keys') or isinstance(ped, dict) else ped[6])
+    i_mun = float(ped['imposto_municipal'] if hasattr(ped, 'keys') or isinstance(ped, dict) else ped[7])
+    i_est = float(ped['imposto_estadual'] if hasattr(ped, 'keys') or isinstance(ped, dict) else ped[8])
+    i_fed = float(ped['imposto_federal'] if hasattr(ped, 'keys') or isinstance(ped, dict) else ped[9])
     
     sub = pf_venda * p_qtd
     v_desc = sub * (p_desc / 100.0)
@@ -1238,7 +1007,6 @@ def imprimir_nf(pedido_id):
     v_mun_calc = liq * (i_mun / 100.0)
     v_est_calc = liq * (i_est / 100.0)
     v_fed_calc = liq * (i_fed / 100.0)
-    
     return render_template('nota_fiscal.html', p=ped, subtotal=sub, v_desconto=v_desc, total_liquido=liq, v_municipal=v_mun_calc, v_estadual=v_est_calc, v_federal=v_fed_calc, total_impostos=v_mun_calc+v_est_calc+v_fed_calc)
 
 @app.route('/financeiro')
@@ -1249,26 +1017,22 @@ def financeiro():
     def valor_campo(row, indice=0):
         if row is None: return 0.0
         if hasattr(row, 'keys') or isinstance(row, dict):
-            chaves = list(row.keys())
-            return float(row[chaves[0]] if chaves else 0.0)
+            return float(row[list(row.keys())[0]])
         return float(row[indice])
 
     cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT COALESCE(SUM(fp.preco_venda_final * pv.quantidade), 0) AS total FROM pedidos_vendas pv JOIN formacao_precos fp ON pv.produto_id = fp.produto_id')
-        faturamento_bruto = valor_campo(cursor.fetchone(), 0)
 
-        cursor.execute("SELECT COALESCE(SUM(salario_base + valor_adicionais), 0) AS total FROM maquinas WHERE operador_nome != 'Posto Vago - Aguardando MOD' AND operador_nome != ''")
-        despesa_pessoal_bruta = valor_campo(cursor.fetchone(), 0)
+    cursor.execute('SELECT COALESCE(SUM(fp.preco_venda_final * pv.quantidade), 0) FROM pedidos_vendas pv JOIN formacao_precos fp ON pv.produto_id = fp.produto_id')
+    faturamento_bruto = valor_campo(cursor.fetchone())
 
-        cursor.execute('SELECT COALESCE(SUM((fp.preco_venda_final * pv.quantidade) * ((fp.imposto_municipal + fp.imposto_estadual + fp.imposto_federal) / 100.0)), 0) AS total FROM pedidos_vendas pv JOIN formacao_precos fp ON pv.produto_id = fp.produto_id')
-        impostos_vendas = valor_campo(cursor.fetchone(), 0)
-        
-        caixa, total = calcular_caixa_disponivel(conn)
-    finally:
-        cursor.close()
-        conn.close()
-        
+    cursor.execute("SELECT COALESCE(SUM(salario_base + valor_adicionais), 0) FROM maquinas WHERE operador_nome != 'Posto Vago - Aguardando MOD' AND operador_nome != ''")
+    despesa_pessoal_bruta = valor_campo(cursor.fetchone())
+
+    cursor.execute('SELECT COALESCE(SUM((fp.preco_venda_final * pv.quantidade) * ((fp.imposto_municipal + fp.imposto_estadual + fp.imposto_federal) / 100.0)), 0) FROM pedidos_vendas pv JOIN formacao_precos fp ON pv.produto_id = fp.produto_id')
+    impostos_vendas = valor_campo(cursor.fetchone())
+    
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
     total_encargos = impostos_vendas + (despesa_pessoal_bruta * 0.20)
     return render_template('financeiro.html', faturamento=faturamento_bruto, custo_pessoal=despesa_pessoal_bruta, impostos=total_encargos, saldo_liquido=caixa, caixa_disponivel=caixa, capital_inicial=total)
 
@@ -1276,7 +1040,7 @@ def financeiro():
 def pagar_dividendos():
     if not session.get('logado'): return redirect(url_for('index'))
     percentual = float(request.form.get('percentual_lucro') or 25.0)
-    flash(f'Distribuição de {percentual}% dos dividendos processada com sucesso no balanço acadêmico!', 'success')
+    flash(f'Distribuição de {percentual}% dos dividendos processada!', 'success')
     return redirect(url_for('financeiro'))
 
 @app.route('/roi')
@@ -1284,29 +1048,21 @@ def roi():
     if not session.get('logado'): return redirect(url_for('index'))
     conn = get_db_connection()
     cursor = conn.cursor()
-    try:
-        cursor.execute('SELECT COALESCE(SUM(fp.preco_venda_final * pv.quantidade), 0) AS receita_bruta, COALESCE(SUM(pv.quantidade), 0) AS total_pecas FROM pedidos_vendas pv JOIN formacao_precos fp ON pv.produto_id = fp.produto_id')
-        v_dados = cursor.fetchone()
-        
-        cursor.execute('SELECT COALESCE(SUM(valor_imovel_estimado + capital_inicial_negocio), 0) AS capital_total, COALESCE(SUM(aluguel_regional), 0) AS aluguel FROM investimentos_imobiliarios')
-        invs = cursor.fetchone()
-        
-        cursor.execute("SELECT COALESCE(SUM(salario_base + valor_adicionais), 0) AS total_pessoal FROM maquinas WHERE operador_nome != 'Posto Vago - Aguardando MOD' AND operador_nome != ''")
-        row_pes = cursor.fetchone()
-        
-        caixa, total = calcular_caixa_disponivel(conn)
-    finally:
-        cursor.close()
-        conn.close()
     
-    # CORREÇÃO DEFINITIVA: Acessa de forma segura seja Tupla ou DictRow (PostgreSQL)
-    if row_pes is not None:
-        if hasattr(row_pes, 'keys') or isinstance(row_pes, dict):
-            despesa_pessoal = float(row_pes['total_pessoal'] if 'total_pessoal' in row_pes else row_pes[list(row_pes.keys())[0]])
-        else:
-            despesa_pessoal = float(row_pes[0] or 0.0)
-    else:
-        despesa_pessoal = 0.0
+    cursor.execute('SELECT COALESCE(SUM(fp.preco_venda_final * pv.quantidade), 0) AS receita_bruta, COALESCE(SUM(pv.quantidade), 0) AS total_pecas FROM pedidos_vendas pv JOIN formacao_precos fp ON pv.produto_id = fp.produto_id')
+    v_dados = cursor.fetchone()
+    
+    cursor.execute('SELECT COALESCE(SUM(valor_imovel_estimado + capital_inicial_negocio), 0) AS capital_total, COALESCE(SUM(aluguel_regional), 0) AS aluguel FROM investimentos_imobiliarios')
+    invs = cursor.fetchone()
+    
+    cursor.execute("SELECT COALESCE(SUM(salario_base + valor_adicionais), 0) FROM maquinas WHERE operador_nome != 'Posto Vago - Aguardando MOD' AND operador_nome != ''")
+    row_pes = cursor.fetchone()
+    
+    # CORREÇÃO DEFINITIVA: Acessa o índice 0 independente se for Tupla ou DictRow
+    despesa_pessoal = float(row_pes[0]) if row_pes is not None else 0.0
+    
+    caixa, total = calcular_caixa_disponivel(conn)
+    conn.close()
     
     # Tratamento seguro para chaves de strings ou índices numéricos nas consultas com aliases
     rec = float(v_dados['receita_bruta'] if (hasattr(v_dados, 'keys') or isinstance(v_dados, dict)) and 'receita_bruta' in v_dados else v_dados[0])
@@ -1319,6 +1075,4 @@ def roi():
     return render_template('roi.html', receita=rec, total_pecas=pecas, capital=cap, payback_real=payback_meses, lucro_acionistas=rec*0.25, caixa_disponivel=caixa, capital_inicial=total)
 
 if __name__ == '__main__':
-    # GARANTIA PEDAGÓGICA: Cria as tabelas e injeta os dados iniciais automaticamente ao subir o app
-    init_db()
     app.run(debug=True)
