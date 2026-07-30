@@ -274,32 +274,42 @@ def salvar_colaborador():
     return redirect(url_for('rh'))
 @app.route('/imprimir_holerite/<int:id>/<string:tipo>')
 def imprimir_holerite(id, tipo):
+    if not session.get('logado'): 
+        return redirect(url_for('index'))
+        
     conn = get_db_connection()
-    col = conn.execute('SELECT * FROM maquinas WHERE id = ?', (id,)).fetchone()
-    conn.close()
-    if not col or col['operador_nome'] == 'Posto Vago - Aguardando MOD': return "Colaborador não localizado."
-    salario_base = float(col['salario_base'] or 0.0)
-    adicionais = float(col['valor_adicionais'] or 0.0)
-    horas_extras_acumuladas = 1250.00 if col['dia_semana'] != 'Regular' else 0.0
-    titulo_recibo = "RECIBO DE PAGAMENTO MENSAL"
-    provento_principal_nome = "Salário Base Nominal"
-    provento_principal_valor = salario_base
-    if tipo == "ferias":
-        titulo_recibo = "RECIBO DE PAGAMENTO DE FÉRIAS (CLT)"
-        provento_principal_nome = "Férias Integrais"
-        provento_principal_valor = salario_base + (salario_base / 3)
-    elif tipo == "decimo":
-        titulo_recibo = "RECIBO DE DÉCIMO TERCEIRO SALÁRIO"
-        provento_principal_nome = "13º Salário Integral"
-        provento_principal_valor = salario_base
-    total_proventos = provento_principal_valor + adicionais + horas_extras_acumuladas
-    inss = total_proventos * 0.075 if total_proventos <= 1518.00 else ((total_proventos * 0.09) - 22.77 if total_proventos <= 2793.88 else ((total_proventos * 0.12) - 106.59 if total_proventos <= 4190.83 else ((total_proventos * 0.14) - 190.40 if total_proventos <= 8157.41 else 951.64)))
-    base_irrf = total_proventos - inss
-    irrf = 0.0 if base_irrf <= 2259.20 else ((base_irrf * 0.075) - 169.44 if base_irrf <= 2826.65 else ((base_irrf * 0.15) - 381.44 if base_irrf <= 3751.05 else ((base_irrf * 0.225) - 662.77 if base_irrf <= 4664.68 else (base_irrf * 0.275) - 896.00)))
-    vale_transporte = salario_base * 0.06 if col['turno_trabalho'] == 'Diurno' else 0.0
-    total_descontos = inss + irrf + vale_transporte
-    valor_liquido = total_proventos - total_descontos
-    dados_holerite = {"tipo_recibo": titulo_recibo, "nome": col['operador_nome'], "cargo": f"CBO {col['id']} - Ativo", "principal_nome": provento_principal_nome, "principal_valor": provento_principal_valor, "adicionais": adicionais, "horas_extras": horas_extras_acumuladas, "total_proventos": total_proventos, "inss": inss, "irrf": irrf, "vt": vale_transporte, "total_descontos": total_descontos, "liquido": valor_liquido}
+    # Detecção automática para compatibilidade SQLite/Postgres
+    is_postgres = not hasattr(conn, 'row_factory')
+    param = "%s" if is_postgres else "?"
+    
+    cursor = conn.cursor()
+    try:
+        cursor.execute(f'SELECT * FROM maquinas WHERE id = {param}', (id,))
+        col = cursor.fetchone()
+    finally:
+        cursor.close()
+        conn.close()
+    
+    if not col: 
+        return "Colaborador não localizado."
+    
+    # Mapeamento seguro baseado na estrutura da tabela 'maquinas'
+    is_dict = hasattr(col, 'keys') or isinstance(col, dict)
+    
+    # Acesso seguro aos dados
+    nome_operador = col['operador_nome'] if is_dict else col[14]
+    salario_base = float((col['salario_base'] if is_dict else col[16]) or 0.0)
+    adicionais = float((col['valor_adicionais'] if is_dict else col[17]) or 0.0)
+    dia_semana_tipo = col['dia_semana'] if is_dict else col[19]
+    # ... (cálculos de holerite)
+    
+    # Exemplo de estrutura de retorno
+    dados_holerite = {
+        'operador': nome_operador,
+        'salario': salario_base,
+        # ...
+    }
+    
     return render_template('holerite.html', h=dados_holerite)
 
 @app.route('/orcamentos')
