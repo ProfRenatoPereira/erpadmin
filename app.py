@@ -93,22 +93,23 @@ def init_db():
     cursor.execute(f'CREATE TABLE IF NOT EXISTS ordens_processo (id {pk_auto}, pedido_id INTEGER NOT NULL, numero_operacao {text_type} NOT NULL, maquina_name {text_type} NOT NULL, codigo_produto {text_type} NOT NULL, nome_produto {text_type} NOT NULL, data_entrada {text_type} NOT NULL, tempo_estimado_min {real_type} NOT NULL, data_saida {text_type} NOT NULL, operador_nome {text_type} DEFAULT \'Pendente\', status {text_type} DEFAULT \'Na Fila\', custo_operacao {real_type} DEFAULT 0.0, FOREIGN KEY(pedido_id) REFERENCES pedidos_vendas(id))')
     conn.commit()
     
-    # Adaptação para leitura de contagem tanto no SQLite quanto no PostgreSQL
+        # Adaptação para leitura de contagem tanto no SQLite quanto no PostgreSQL
     cursor.execute('SELECT COUNT(*) AS total FROM investimentos_imobiliarios')
     row = cursor.fetchone()
     total_registros = row[0] if isinstance(row, tuple) else row['total']
 
-        if total_registros == 0:
+    if total_registros == 0:
         # Se for PostgreSQL substitui os marcadores '?' por '%s' dinamicamente
         param = "%s" if is_postgres else "?"
         
+        # CORREÇÃO AQUI: Mudado de 'city_regiao' para 'cidade_regiao' para bater com o banco
         cursor.execute('''
             INSERT INTO investimentos_imobiliarios (turma_nome, cidade_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio)
             VALUES ('Metalúrgica Modelo S/A - Cenário Base', 'Curitiba CIC', 'CIC (Distrito Industrial)', 450.00, 11.39, 3825000.00, 13500.00, 25.0, 500000.00)
         ''')
         conn.commit()
 
-        # CORREÇÃO AQUI: Alinhamento perfeito dos blocos FOR para evitar o IndentationError
+        # ALINHAMENTO CORRETO: Sem espaços extras à esquerda para sumir com o IndentationError
         for k, m in CATALOGO_MAQUINAS.items():
             if k in ['cnc_romi', 'prensa_100t', 'forno_tempera']:
                 minutos_mes = 44 * 4.33 * 60
@@ -121,24 +122,19 @@ def init_db():
         for mat in CATALOGO_MATERIAIS.values():
             cursor.execute(f"INSERT INTO materiais (codigo_material, nome_material, preco_unidade, dimensoes, volume_disponivel) VALUES ({param}, {param}, {param}, {param}, {param})", (mat['cod'], mat['nome'], mat['preco'], mat['dim'], mat['vol']))
             
-        # 1. Garante a limpeza prévia em caso de reinicializações sucessivas
         cursor.execute("DELETE FROM estoque_produtos")
         cursor.execute("DELETE FROM formacao_precos")
         cursor.execute("DELETE FROM estrutura_produto")
         cursor.execute("DELETE FROM produtos")
         
-        # 2. Insere fixando o ID em 1 para dar suporte perfeito às restrições FK
         cursor.execute(f"INSERT INTO produtos (id, codigo_produto, nome_produto, custo_total_fabricacao) VALUES (1, 'PROD-EIXO-CNC', 'Eixo de Transmissão Usinado', 115.40)")
-        
-        # 3. Força o commit do produto mestre de forma síncrona
         conn.commit()
         
-        # 4. Popula com total segurança as tabelas dependentes associadas ao ID 1
         cursor.execute(f"INSERT INTO estrutura_produto (produto_id, maquina_id, material_id, tempo_processo_min, quantidade_material) VALUES (1, 1, 2, 12.0, 1.5)")
         cursor.execute(f"INSERT INTO formacao_precos (produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES (1, 5.0, 18.0, 9.25, 35.0, 245.50)")
         cursor.execute(f"INSERT INTO estoque_produtos (produto_id, quantidade_disponivel) VALUES (1, 25.0)")
         conn.commit()
-
+        
     cursor.close()
     conn.close()
 
