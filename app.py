@@ -98,21 +98,21 @@ def init_db():
     row = cursor.fetchone()
     total_registros = row[0] if isinstance(row, tuple) else row['total']
 
-    if total_registros == 0:
-        # CORREÇÃO: Alterado de 'city_regiao' para 'cidade_regiao' para bater com o CREATE TABLE acima
+        if total_registros == 0:
+        # Se for PostgreSQL substitui os marcadores '?' por '%s' dinamicamente
+        param = "%s" if is_postgres else "?"
+        
         cursor.execute('''
             INSERT INTO investimentos_imobiliarios (turma_nome, cidade_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio)
             VALUES ('Metalúrgica Modelo S/A - Cenário Base', 'Curitiba CIC', 'CIC (Distrito Industrial)', 450.00, 11.39, 3825000.00, 13500.00, 25.0, 500000.00)
         ''')
         conn.commit()
-    
-    cursor.close()
-    conn.close()
-        
-                for k, m in CATALOGO_MAQUINAS.items():
+
+        # CORREÇÃO AQUI: Alinhamento perfeito dos blocos FOR para evitar o IndentationError
+        for k, m in CATALOGO_MAQUINAS.items():
             if k in ['cnc_romi', 'prensa_100t', 'forno_tempera']:
                 minutos_mes = 44 * 4.33 * 60
-                c_mm = (m['dep'] / minutes_mes) + ((m['pot'] * 0.75) / 60) + (13500.00 / minutes_mes)
+                c_mm = (m['dep'] / minutos_mes) + ((m['pot'] * 0.75) / 60) + (13500.00 / minutos_mes)
                 cursor.execute(f'''
                     INSERT INTO maquinas (nome_equipamento, potencia, consumo_eletrico, velocidade, avanco, comprimento_max, diametro_max, frequencia_manutencao, horas_trabalhadas, preco_compra, depreciacao_mensal, valor_venda_final, custo_minuto_maquina, operador_nome, custo_minuto_operador, salario_base, valor_adicionais, turno_trabalho, dia_semana, vida_util_meses)
                     VALUES ({param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, 0, {param}, {param}, {param}, {param}, {param}, {param}, {param}, {param}, 'Diurno', 'Regular', {param})
@@ -138,6 +138,8 @@ def init_db():
         cursor.execute(f"INSERT INTO formacao_precos (produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES (1, 5.0, 18.0, 9.25, 35.0, 245.50)")
         cursor.execute(f"INSERT INTO estoque_produtos (produto_id, quantidade_disponivel) VALUES (1, 25.0)")
         conn.commit()
+
+    cursor.close()
     conn.close()
 
 # Executa a inicialização de tabelas e injeção do cenário
