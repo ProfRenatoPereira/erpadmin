@@ -189,42 +189,68 @@ def login_validar():
 
 @app.route('/inicializar_simulador', methods=['POST'])
 def inicializar_simulador():
-    if not session.get('logado'): return redirect(url_for('index'))
+    if not session.get('logado'): 
+        return redirect(url_for('index'))
+        
+    # Coleta os dados do novo formulário (inicializar.html)
     nome_empresa = request.form.get('nome_empresa', 'Empresa Simulada S/A')
     try: 
         capital_inicial = float(request.form.get('capital_inicial', 0))
     except ValueError: 
         capital_inicial = 0.0
+        
     conn = get_db_connection()
     is_postgres = not hasattr(conn, 'row_factory')
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM ordens_processo')
-    cursor.execute('DELETE FROM pedidos_vendas')
-    cursor.execute('DELETE FROM estoque_produtos')
-    cursor.execute('DELETE FROM formacao_precos')
-    cursor.execute('DELETE FROM estrutura_produto')
-    cursor.execute('DELETE FROM produtos')
-    cursor.execute('DELETE FROM materiais')
-    cursor.execute('DELETE FROM maquinas')
-    cursor.execute('DELETE FROM investimentos_imobiliarios')
-    cursor.execute('DELETE FROM requisicoes_compras')
-    conn.commit()
-    conn.close()
+    try:
+        # Limpeza segura de dados de simulações passadas
+        cursor.execute('DELETE FROM ordens_processo')
+        cursor.execute('DELETE FROM pedidos_vendas')
+        cursor.execute('DELETE FROM estoque_produtos')
+        cursor.execute('DELETE FROM formacao_precos')
+        cursor.execute('DELETE FROM estrutura_produto')
+        cursor.execute('DELETE FROM produtos')
+        cursor.execute('DELETE FROM materiais')
+        cursor.execute('DELETE FROM maquinas')
+        cursor.execute('DELETE FROM investimentos_imobiliarios')
+        cursor.execute('DELETE FROM requisicoes_compras')
+        cursor.execute('DELETE FROM configuracao_equipe') # Limpa configuração anterior
+        conn.commit()
+    finally:
+        cursor.close()
+        conn.close()
     
+    # Recria a estrutura básica e injeta catálogos padrões
     init_db()
     
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(f'''
-        INSERT INTO investimentos_imobiliarios (turma_nome, cidade_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio)
-        VALUES ({param}, 'Não Definido', 'Não Definido', 0.0, 11.39, 0.0, 0.0, 0.0, {param})
-    ''', (nome_empresa, capital_inicial))
-    conn.commit()
-    conn.close()
-    flash(f'Empresa {nome_empresa} inicializada com sucesso!', 'success')
+    try:
+        # Grava na nova tabela persistindo o nome oficial desta rodada
+        cursor.execute(f'''
+            INSERT INTO configuracao_equipe (nome_equipe, aporte_inicial)
+            VALUES ({param}, {param})
+        ''', (nome_empresa, capital_inicial))
+        
+        # CORREÇÃO AQUI: Alterado de 'city_regiao' para 'cidade_regiao' para bater com o init_db()
+        cursor.execute(f'''
+            INSERT INTO investimentos_imobiliarios (turma_nome, cidade_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio)
+            VALUES ({param}, 'Não Definido', 'Não Definido', 0.0, 11.39, 0.0, 0.0, 0.0, {param})
+        ''', (nome_empresa, capital_inicial))
+        
+        conn.commit()
+    finally:
+        cursor.close()
+        conn.close()
+    
+    # Guarda o nome configurado na sessão atual para uso rápido no layout do cabeçalho
+    session['nome_empresa_simulada'] = nome_empresa
+    
+    flash(f'Simulador inicializado com sucesso para a equipe: {nome_empresa}!', 'success')
     return redirect(url_for('estrutura'))
+
 @app.route('/professor_painel_secreto')
 def professor_painel():
     conn = get_db_connection()
