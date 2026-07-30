@@ -274,43 +274,33 @@ def salvar_colaborador():
     return redirect(url_for('rh'))
 @app.route('/imprimir_holerite/<int:id>/<string:tipo>')
 def imprimir_holerite(id, tipo):
-    if not session.get('logado'): 
-        return redirect(url_for('index'))
-        
+    if not session.get('logado'): return redirect(url_for('index'))
+    
     conn = get_db_connection()
-    # Detecção automática para compatibilidade SQLite/Postgres
     is_postgres = not hasattr(conn, 'row_factory')
-    param = "%s" if is_postgres else "?"
-    
     cursor = conn.cursor()
-    try:
-        cursor.execute(f'SELECT * FROM maquinas WHERE id = {param}', (id,))
-        col = cursor.fetchone()
-    finally:
-        cursor.close()
-        conn.close()
+    cursor.execute(f'SELECT * FROM maquinas WHERE id = {"%s" if is_postgres else "?"}', (id,))
+    col = cursor.fetchone()
+    cursor.close(); conn.close()
     
-    if not col: 
+    if not col or (col['operador_nome'] if hasattr(col, 'keys') else col[14]) == 'Posto Vago - Aguardando MOD': 
         return "Colaborador não localizado."
     
-    # Mapeamento seguro baseado na estrutura da tabela 'maquinas'
+    # Mapeamento e cálculos (valores padrão conforme solicitado)
     is_dict = hasattr(col, 'keys') or isinstance(col, dict)
+    salario = float(col['salario_base'] if is_dict else col[16] or 0.0)
+    adicionais = float(col['valor_adicionais'] if is_dict else col[17] or 0.0)
     
-    # Acesso seguro aos dados
-    nome_operador = col['operador_nome'] if is_dict else col[14]
-    salario_base = float((col['salario_base'] if is_dict else col[16]) or 0.0)
-    adicionais = float((col['valor_adicionais'] if is_dict else col[17]) or 0.0)
-    dia_semana_tipo = col['dia_semana'] if is_dict else col[19]
-    # ... (cálculos de holerite)
+    # Lógica de tipos e impostos
+    # ... (cálculos de INSS/IRRF baseados em tabela progressiva) ...
     
-    # Exemplo de estrutura de retorno
     dados_holerite = {
-        'operador': nome_operador,
-        'salario': salario_base,
-        # ...
+        "tipo_recibo": "RECIBO..." if tipo != "ferias" else "FÉRIAS", 
+        "nome": col['operador_nome'] if is_dict else col[14],
+        # ... outros campos mapeados ...
     }
     
-    return render_template('holerite.html', h=dados_holerite)
+    return render_template('recibo_trabalhista.html', h=dados_holerite)
 
 @app.route('/orcamentos')
 def orcamentos():
