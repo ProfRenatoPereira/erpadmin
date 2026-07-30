@@ -461,8 +461,12 @@ def imprimir_holerite(id, tipo):
     vale_transporte = salario_base * 0.06 if col['turno_trabalho'] == 'Diurno' else 0.0
     total_descontos = inss + irrf + vale_transporte
     valor_liquido = total_proventos - total_descontos
-    dados_holerite = {"tipo_recibo": titulo_recibo, "nome": col['operador_nome'], "cargo": f"CBO {col['id']} - Ativo", "principal_nome": provento_principal_nome, "principal_valor": provento_principal_valor, "adicionais": adicionais, "horas_extras": horas_extras_acumuladas, "total_proventos": total_proventos, "inss": inss, "irrf": irrf, "vt": vale_transporte, "total_descontos": total_descontos, "liquido": valor_liquido}
-    return render_template('holerite.html', h=dados_holerite)
+    
+    # AJUSTE 1: Alterado de "horas_extras" para "he" para sincronizar com a linha 149 do seu HTML
+    dados_holerite = {"tipo_recibo": titulo_recibo, "nome": col['operador_nome'], "cargo": f"CBO {col['id']} - Ativo", "principal_nome": provento_principal_nome, "principal_valor": provento_principal_valor, "adicionais": adicionais, "he": horas_extras_acumuladas, "total_proventos": total_proventos, "inss": inss, "irrf": irrf, "vt": vale_transporte, "total_descontos": total_descontos, "liquido": valor_liquido}
+    
+    # AJUSTE 2: Direcionado para o arquivo correto 'recibo_trabalhista.html' existente no seu GitHub
+    return render_template('recibo_trabalhista.html', h=dados_holerite)
 
 @app.route('/orcamentos')
 def orcamentos():
