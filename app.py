@@ -170,15 +170,19 @@ def login_validar():
     param = "%s" if is_postgres else "?"
     
     cursor = conn.cursor()
-    cursor.execute(f'SELECT * FROM usuarios WHERE usuario = {param}', (user_input,))
-    user = cursor.fetchone()
-    conn.close()
+    try:
+        cursor.execute(f'SELECT * FROM usuarios WHERE usuario = {param}', (user_input,))
+        user = cursor.fetchone()
+    finally:
+        cursor.close()
+        conn.close()
     
     if user and check_password_hash(user['senha'], pass_input):
         session['logado'] = True
         session['usuario_equipe'] = user_input
         flash('Credenciais validadas com sucesso!', 'success')
-        return redirect(url_for('estrutura'))
+        # CORREÇÃO: Alterado de 'estrutura' para 'configurar_rodada' para exibir a tela intermediária
+        return redirect(url_for('configurar_rodada'))
     else:
         flash('Usuário ou senha inválidos!', 'danger')
         return redirect(url_for('index'))
@@ -187,8 +191,10 @@ def login_validar():
 def inicializar_simulador():
     if not session.get('logado'): return redirect(url_for('index'))
     nome_empresa = request.form.get('nome_empresa', 'Empresa Simulada S/A')
-    try: capital_inicial = float(request.form.get('capital_inicial', 0))
-    except ValueError: capital_inicial = 0.0
+    try: 
+        capital_inicial = float(request.form.get('capital_inicial', 0))
+    except ValueError: 
+        capital_inicial = 0.0
     conn = get_db_connection()
     is_postgres = not hasattr(conn, 'row_factory')
     param = "%s" if is_postgres else "?"
