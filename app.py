@@ -63,6 +63,7 @@ def init_db():
     pk_auto = "SERIAL PRIMARY KEY" if is_postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
     text_type = "TEXT"
     real_type = "REAL"
+    text_default = "TEXT" if is_postgres else "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
     ts_default = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
 
     cursor.execute(f'CREATE TABLE IF NOT EXISTS usuarios (id {pk_auto}, usuario {text_type} UNIQUE NOT NULL, senha {text_type} NOT NULL, aprovado INTEGER DEFAULT 0)')
@@ -88,7 +89,7 @@ def init_db():
         param = "%s" if is_postgres else "?"
         
         cursor.execute(f'''
-            INSERT INTO investimentos_imobiliarios (turma_nome, cidade_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio)
+            INSERT INTO investimentos_imobiliarios (turma_nome, city_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio)
             VALUES ('Metalúrgica Modelo S/A - Cenário Base', 'Curitiba CIC', 'CIC (Distrito Industrial)', 450.00, 11.39, 3825000.00, 13500.00, 25.0, 500000.00)
         ''')
         
@@ -104,7 +105,19 @@ def init_db():
         for mat in CATALOGO_MATERIAIS.values():
             cursor.execute(f"INSERT INTO materiais (codigo_material, nome_material, preco_unidade, dimensoes, volume_disponivel) VALUES ({param}, {param}, {param}, {param}, {param})", (mat['cod'], mat['nome'], mat['preco'], mat['dim'], mat['vol']))
             
-        cursor.execute(f"INSERT INTO produtos (codigo_produto, nome_produto, custo_total_fabricacao) VALUES ('PROD-EIXO-CNC', 'Eixo de Transmissão Usinado', 115.40)")
+        # 1. Garante a limpeza prévia em caso de reinicializações sucessivas
+        cursor.execute("DELETE FROM estoque_produtos")
+        cursor.execute("DELETE FROM formacao_precos")
+        cursor.execute("DELETE FROM estrutura_produto")
+        cursor.execute("DELETE FROM produtos")
+        
+        # 2. Insere fixando o ID em 1 para dar suporte perfeito às restrições FK
+        cursor.execute(f"INSERT INTO produtos (id, codigo_produto, nome_produto, custo_total_fabricacao) VALUES (1, 'PROD-EIXO-CNC', 'Eixo de Transmissão Usinado', 115.40)")
+        
+        # 3. Força o commit do produto mestre de forma síncrona
+        conn.commit()
+        
+        # 4. Popula com total segurança as tabelas dependentes associadas ao ID 1
         cursor.execute(f"INSERT INTO estrutura_produto (produto_id, maquina_id, material_id, tempo_processo_min, quantidade_material) VALUES (1, 1, 2, 12.0, 1.5)")
         cursor.execute(f"INSERT INTO formacao_precos (produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES (1, 5.0, 18.0, 9.25, 35.0, 245.50)")
         cursor.execute(f"INSERT INTO estoque_produtos (produto_id, quantidade_disponivel) VALUES (1, 25.0)")
