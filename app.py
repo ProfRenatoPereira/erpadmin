@@ -283,7 +283,13 @@ def imprimir_holerite(id, tipo):
     col = cursor.fetchone()
     cursor.close(); conn.close()
     
-    if not col or (col['operador_nome'] if hasattr(col, 'keys') else col[14]) == 'Posto Vago - Aguardando MOD': 
+        if col is None:
+        return "Colaborador não localizado."
+        
+    is_dict = hasattr(col, 'keys') or isinstance(col, dict)
+    nome_operador = col['operador_nome'] if is_dict else col[14]
+    
+    if nome_operador == 'Posto Vago - Aguardando MOD':
         return "Colaborador não localizado."
     
     # Mapeamento e cálculos (valores padrão conforme solicitado)
