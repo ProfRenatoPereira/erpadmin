@@ -29,67 +29,47 @@ CATALOGO_MATERIAIS = {
 }
 
 def get_db_connection():
-    # Lê a URL de conexão direta fornecida pela Render nas variáveis de ambiente
-    db_url = os.environ.get('DATABASE_URL')
-    
-    # Se a URL começar com 'postgres://', converte para 'postgresql://' (exigência do Python)
-    if db_url and db_url.startswith("postgres://"):
-        db_url = db_url.replace("postgres://", "postgresql://", 1)
-        
-    import psycopg2
-    from psycopg2.extras import DictCursor
-    conn = psycopg2.connect(db_url, cursor_factory=DictCursor)
+    conn = sqlite3.connect(DATABASE)
+    conn.row_factory = sqlite3.Row
     return conn
 def init_db():
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    # Força a atualização da estrutura limpando tabelas antigas incompatíveis
-    cursor.execute('DROP TABLE IF EXISTS investimentos_imobiliarios CASCADE')
-    cursor.execute('DROP TABLE IF EXISTS maquinas CASCADE')
-    
-    # 1. Criação das tabelas em conformidade estrita com o PostgreSQL
-    cursor.execute('CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, usuario TEXT UNIQUE NOT NULL, senha TEXT NOT NULL, aprovado INTEGER DEFAULT 0)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS investimentos_imobiliarios (id SERIAL PRIMARY KEY, cidade_regiao TEXT NOT NULL, bairro_imovel TEXT NOT NULL, area_imovel REAL NOT NULL, valor_imovel_estimado REAL NOT NULL, taxa_selic REAL NOT NULL, aluguel_regional REAL NOT NULL, retorno_acionistas REAL NOT NULL, capital_inicial_negocio REAL DEFAULT 0.0)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS maquinas (id SERIAL PRIMARY KEY, nome_equipamento TEXT NOT NULL, potencia REAL NOT NULL, consumo_eletrico REAL NOT NULL, velocidade TEXT NOT NULL, preco_compra REAL NOT NULL, depreciacao_mensal REAL NOT NULL, custo_minuto_maquina REAL DEFAULT 0.0, operador_nome TEXT DEFAULT \'Posto Vago - Aguardando MOD\', custo_minuto_operador REAL DEFAULT 0.0, salario_base REAL DEFAULT 0.0, valor_adicionais REAL DEFAULT 0.0)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS materiais (id SERIAL PRIMARY KEY, codigo_material TEXT UNIQUE NOT NULL, nome_material TEXT NOT NULL, preco_unidade REAL NOT NULL, volume_disponivel REAL DEFAULT 0.0)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS produtos (id SERIAL PRIMARY KEY, codigo_produto TEXT UNIQUE NOT NULL, nome_produto TEXT NOT NULL, custo_total_fabricacao REAL DEFAULT 0.0)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS estrutura_produto (id SERIAL PRIMARY KEY, produto_id INTEGER, maquina_id INTEGER, material_id INTEGER, tempo_processo_min REAL DEFAULT 0, quantidade_material REAL DEFAULT 0)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS formacao_precos (id SERIAL PRIMARY KEY, produto_id INTEGER UNIQUE, iss REAL DEFAULT 0, icms REAL DEFAULT 0, federais REAL DEFAULT 0, margem_lucro REAL DEFAULT 0, preco_venda REAL DEFAULT 0)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS pedidos_vendas (id SERIAL PRIMARY KEY, cliente_nome TEXT NOT NULL, produto_id INTEGER, quantidade INTEGER NOT NULL, status TEXT DEFAULT \'Aberto\', data_pedido TEXT)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS ordens_processo (id SERIAL PRIMARY KEY, pedido_id INTEGER, maquina_id INTEGER, tempo_lote_min REAL, custo_total_operacao REAL, status TEXT DEFAULT \'Na Fila\', data_entrada TEXT, data_saida TEXT)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS estoque_produtos (id SERIAL PRIMARY KEY, produto_id INTEGER UNIQUE, quantidade_disponivel REAL DEFAULT 0.0)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS requisicoes_compras (id SERIAL PRIMARY KEY, material_id INTEGER, quantidade_solicitada REAL, status TEXT DEFAULT \'Aguardando Cotação\', menor_preco REAL DEFAULT 0.0, melhor_fornecedor TEXT DEFAULT \'-\')')
-    cursor.execute('CREATE TABLE IF NOT EXISTS caixa (id SERIAL PRIMARY KEY, descricao TEXT, tipo TEXT, valor REAL, data_movimentação TEXT)')
-
-    # 2. Carga Inicial de Dados Tratada para o Driver Postgres (psycopg2)
-    cursor.execute('SELECT COUNT(*) FROM usuarios')
-    if cursor.fetchone()[0] == 0:
-        cursor.execute('INSERT INTO usuarios (usuario, senha, aprovado) VALUES (%s, %s, %s)', ('admin', generate_password_hash('admin'), 1))
-        
-    cursor.execute('SELECT COUNT(*) FROM investimentos_imobiliarios')
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO investimentos_imobiliarios (cidade_regiao, bairro_imovel, area_imovel, valor_imovel_estimado, taxa_selic, aluguel_regional, retorno_acionistas, capital_inicial_negocio) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)", ('Metalúrgica Modelo S/A - Cenário Base', 'Curitiba CIC', 'CIC (Distrito Industrial)', 450.00, 11.39, 3825000.00, 13500.00, 25.0, 500000.00))
-        
-    cursor.execute('SELECT COUNT(*) FROM materiais')
-    if cursor.fetchone()[0] == 0:
-        for k, v in CATALOGO_MATERIAIS.items():
-            cursor.execute('INSERT INTO materiais (codigo_material, nome_material, preco_unidade, volume_disponivel) VALUES (%s, %s, %s, %s)', (k, v['nome'], v['preco'], 150.0))
-            
-    cursor.execute('SELECT COUNT(*) FROM maquinas')
-    if cursor.fetchone()[0] == 0:
-        for k, v in CATALOGO_MAQUINAS.items():
-            cursor.execute('INSERT INTO maquinas (nome_equipamento, potencia, consumo_eletrico, velocidade, preco_compra, depreciacao_mensal, custo_minuto_maquina) VALUES (%s, %s, %s, %s, %s, %s, %s)', (v['nome'], v['pot'], v['consumo'], v['vel'], v['preco'], v['dep'], 0.15))
-            
-    cursor.execute('SELECT COUNT(*) FROM produtos')
-    if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO produtos (codigo_produto, nome_produto, custo_total_fabricacao) VALUES ('PROD-EIXO-CNC', 'Eixo de Transmissão Usinado', 115.40)")
-        cursor.execute("INSERT INTO estoque_produtos (produto_id, quantidade_disponivel) VALUES (1, 25.0)")
-        
+    cursor.execute('CREATE TABLE IF NOT EXISTS usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, usuario TEXT UNIQUE NOT NULL, senha TEXT NOT NULL, aprovado INTEGER DEFAULT 0)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS investimentos_imobiliarios (id INTEGER PRIMARY KEY AUTOINCREMENT, turma_nome TEXT NOT NULL, cidade_regiao TEXT NOT NULL, bairro_imovel TEXT NOT NULL, area_imovel REAL NOT NULL, taxa_selic REAL NOT NULL, valor_imovel_estimado REAL NOT NULL, aluguel_regional REAL NOT NULL, perc_acionistas REAL NOT NULL, capital_inicial_negocio REAL DEFAULT 0.0)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS maquinas (id INTEGER PRIMARY KEY AUTOINCREMENT, nome_equipamento TEXT NOT NULL, potencia REAL NOT NULL, consumo_eletrico REAL NOT NULL, velocidade TEXT, avanco TEXT, comprimento_max REAL, diametro_max REAL, frequencia_manutencao INTEGER NOT NULL, horas_trabalhadas INTEGER DEFAULT 0, preco_compra REAL NOT NULL, depreciacao_mensal REAL NOT NULL, valor_venda_final REAL NOT NULL, custo_minuto_maquina REAL NOT NULL, operador_nome TEXT DEFAULT "Posto Vago - Aguardando MOD", custo_minuto_operador REAL DEFAULT 0.0, salario_base REAL DEFAULT 0.0, valor_adicionais REAL DEFAULT 0.0, turno_trabalho TEXT DEFAULT "Diurno", dia_semana TEXT DEFAULT "Regular", vida_util_meses INTEGER DEFAULT 120)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS materiais (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo_material TEXT UNIQUE NOT NULL, nome_material TEXT NOT NULL, preco_unidade REAL NOT NULL, dimensoes TEXT, volume_disponivel REAL NOT NULL)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS requisicoes_compras (id INTEGER PRIMARY KEY AUTOINCREMENT, equipamento_tipo TEXT NOT NULL, especificacao_desejada TEXT NOT NULL, quantidade INTEGER DEFAULT 1, status TEXT DEFAULT "Pendente em Cotação", preco_cotado REAL DEFAULT 0, potencia_cotada REAL DEFAULT 0, depreciacao_sugerida REAL DEFAULT 0, vida_util_sugerida INTEGER DEFAULT 120, data_requisicao TIMESTAMP DEFAULT CURRENT_TIMESTAMP)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS produtos (id INTEGER PRIMARY KEY AUTOINCREMENT, codigo_produto TEXT UNIQUE NOT NULL, nome_produto TEXT NOT NULL, custo_total_fabricacao REAL DEFAULT 0)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS estrutura_produto (id INTEGER PRIMARY KEY AUTOINCREMENT, produto_id INTEGER NOT NULL, maquina_id INTEGER, material_id INTEGER, tempo_processo_min REAL DEFAULT 0, quantidade_material REAL DEFAULT 0, FOREIGN KEY(produto_id) REFERENCES produtos(id))')
+    cursor.execute('CREATE TABLE IF NOT EXISTS formacao_precos (id INTEGER PRIMARY KEY AUTOINCREMENT, produto_id INTEGER UNIQUE NOT NULL, imposto_municipal REAL DEFAULT 0, imposto_estadual REAL DEFAULT 0, imposto_federal REAL DEFAULT 0, margem_lucro REAL DEFAULT 0, preco_venda_final REAL DEFAULT 0, FOREIGN KEY(produto_id) REFERENCES produtos(id))')
+    cursor.execute('CREATE TABLE IF NOT EXISTS estoque_produtos (id INTEGER PRIMARY KEY AUTOINCREMENT, produto_id INTEGER UNIQUE NOT NULL, quantidade_disponivel REAL DEFAULT 0, FOREIGN KEY(produto_id) REFERENCES produtos(id))')
+    cursor.execute('CREATE TABLE IF NOT EXISTS pedidos_vendas (id INTEGER PRIMARY KEY AUTOINCREMENT, produto_id INTEGER NOT NULL, quantidade INTEGER NOT NULL, desconto_percentual REAL DEFAULT 0, observacoes TEXT, data_pedido TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(produto_id) REFERENCES produtos(id))')
+    cursor.execute('CREATE TABLE IF NOT EXISTS ordens_processo (id INTEGER PRIMARY KEY AUTOINCREMENT, pedido_id INTEGER NOT NULL, numero_operacao TEXT NOT NULL, maquina_name TEXT NOT NULL, codigo_produto TEXT NOT NULL, nome_produto TEXT NOT NULL, data_entrada TEXT NOT NULL, tempo_estimado_min REAL NOT NULL, data_saida TEXT NOT NULL, operador_nome TEXT DEFAULT "Pendente", status TEXT DEFAULT "Na Fila", custo_operacao REAL DEFAULT 0.0, FOREIGN KEY(pedido_id) REFERENCES pedidos_vendas(id))')
     conn.commit()
-    cursor.close()
+    check = cursor.execute('SELECT COUNT(*) AS total FROM investimentos_imobiliarios').fetchone()
+    if check['total'] == 0:
+        cursor.execute('''
+            INSERT INTO investimentos_imobiliarios (turma_nome, cidade_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio)
+            VALUES ('Metalúrgica Modelo S/A - Cenário Base', 'Curitiba CIC', 'CIC (Distrito Industrial)', 450.00, 11.39, 3825000.00, 13500.00, 25.0, 500000.00)
+        ''')
+        for k, m in CATALOGO_MAQUINAS.items():
+            if k in ['cnc_romi', 'prensa_100t', 'forno_tempera']:
+                minutos_mes = 44 * 4.33 * 60
+                c_mm = (m['dep'] / minutos_mes) + ((m['pot'] * 0.75) / 60) + (13500.00 / minutos_mes)
+                cursor.execute('''
+                    INSERT INTO maquinas (nome_equipamento, potencia, consumo_eletrico, velocidade, avanco, comprimento_max, diametro_max, frequencia_manutencao, horas_trabalhadas, preco_compra, depreciacao_mensal, valor_venda_final, custo_minuto_maquina, operador_nome, custo_minuto_operador, salario_base, valor_adicionais, turno_trabalho, dia_semana, vida_util_meses)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, 'Diurno', 'Regular', ?)
+                ''', (m['nome'], m['pot'], m['cons'], m['vel'], m['avan'], m['comp'], m['diam'], m['mnt'], m['preco'], m['dep'], m['venda'], c_mm, m['operador'], m['custo_op'], m['salario'], m['adic'], m['vida']))
+        for mat in CATALOGO_MATERIAIS.values():
+            cursor.execute("INSERT INTO materiais (codigo_material, nome_material, preco_unidade, dimensoes, volume_disponivel) VALUES (?, ?, ?, ?, ?)", (mat['cod'], mat['nome'], mat['preco'], mat['dim'], mat['vol']))
+        cursor.execute("INSERT INTO produtos (id, codigo_produto, nome_produto, custo_total_fabricacao) VALUES (1, 'PROD-EIXO-CNC', 'Eixo de Transmissão Usinado', 115.40)")
+        cursor.execute("INSERT INTO estrutura_produto (produto_id, maquina_id, material_id, tempo_processo_min, quantidade_material) VALUES (1, 1, 2, 12.0, 1.5)")
+        cursor.execute("INSERT INTO formacao_precos (produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES (1, 5.0, 18.0, 9.25, 35.0, 245.50)")
+        cursor.execute("INSERT INTO estoque_produtos (produto_id, quantidade_disponivel) VALUES (1, 25.0)")
+        conn.commit()
     conn.close()
-    
+
 if not os.path.exists(DATABASE):
     init_db()
 def calcular_caixa_disponivel(conn):
@@ -295,21 +275,15 @@ def salvar_colaborador():
 @app.route('/imprimir_holerite/<int:id>/<string:tipo>')
 def imprimir_holerite(id, tipo):
     if not session.get('logado'): return redirect(url_for('index'))
+    
     conn = get_db_connection()
     is_postgres = not hasattr(conn, 'row_factory')
     cursor = conn.cursor()
     cursor.execute(f'SELECT * FROM maquinas WHERE id = {"%s" if is_postgres else "?"}', (id,))
     col = cursor.fetchone()
     cursor.close(); conn.close()
-
-    # ESSAS LINHAS DEVEM ESTAR COM EXATAMENTE 4 ESPAÇOS DE RECUO:
-    if col is None:
-        return "Colaborador não localizado."
-
-    is_dict = hasattr(col, 'keys') or isinstance(col, dict)
-    nome_operador = col['operador_nome'] if is_dict else col
-
-    if nome_operador == 'Posto Vago - Aguardando MOD':
+    
+    if not col or (col['operador_nome'] if hasattr(col, 'keys') else col[14]) == 'Posto Vago - Aguardando MOD': 
         return "Colaborador não localizado."
     
     # Mapeamento e cálculos (valores padrão conforme solicitado)
