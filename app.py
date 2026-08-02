@@ -275,20 +275,20 @@ def salvar_colaborador():
 @app.route('/imprimir_holerite/<int:id>/<string:tipo>')
 def imprimir_holerite(id, tipo):
     if not session.get('logado'): return redirect(url_for('index'))
-    
     conn = get_db_connection()
     is_postgres = not hasattr(conn, 'row_factory')
     cursor = conn.cursor()
     cursor.execute(f'SELECT * FROM maquinas WHERE id = {"%s" if is_postgres else "?"}', (id,))
     col = cursor.fetchone()
     cursor.close(); conn.close()
-    
-        if col is None:
+
+    # ESSAS LINHAS DEVEM ESTAR COM EXATAMENTE 4 ESPAÇOS DE RECUO:
+    if col is None:
         return "Colaborador não localizado."
-        
+
     is_dict = hasattr(col, 'keys') or isinstance(col, dict)
-    nome_operador = col['operador_nome'] if is_dict else col[14]
-    
+    nome_operador = col['operador_nome'] if is_dict else col
+
     if nome_operador == 'Posto Vago - Aguardando MOD':
         return "Colaborador não localizado."
     
