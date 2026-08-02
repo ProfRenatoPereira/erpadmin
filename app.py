@@ -42,12 +42,11 @@ def get_db_connection():
     return conn
 def init_db():
     conn = get_db_connection()
-    is_postgres = not hasattr(conn, 'row_factory')
     cursor = conn.cursor()
     
     # 1. Criação das tabelas compatíveis com PostgreSQL
     cursor.execute('CREATE TABLE IF NOT EXISTS usuarios (id SERIAL PRIMARY KEY, usuario TEXT UNIQUE NOT NULL, senha TEXT NOT NULL, aprovado INTEGER DEFAULT 0)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS investimentos_imobiliarios (id SERIAL PRIMARY KEY, cidade_regiao TEXT NOT NULL, bairro_imovel TEXT NOT NULL, area_imovel REAL NOT NULL, taxa_selic REAL NOT NULL, valor_imovel_estimado REAL NOT NULL, aluguel_regional REAL NOT NULL, retorno_acionistas REAL NOT NULL, capital_inicial_negocio REAL DEFAULT 0.0)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS investimentos_imobiliarios (id SERIAL PRIMARY KEY, cidade_regiao TEXT NOT NULL, bairro_imovel TEXT NOT NULL, area_imovel REAL NOT NULL, valor_imovel_estimado REAL NOT NULL, taxa_selic REAL NOT NULL, aluguel_regional REAL NOT NULL, retorno_acionistas REAL NOT NULL, capital_inicial_negocio REAL DEFAULT 0.0)')
     cursor.execute('CREATE TABLE IF NOT EXISTS maquinas (id SERIAL PRIMARY KEY, nome_equipamento TEXT NOT NULL, potencia REAL NOT NULL, consumo_eletrico REAL NOT NULL, velocidade TEXT NOT NULL, preco_compra REAL NOT NULL, depreciacao_mensal REAL NOT NULL, custo_minuto_maquina REAL DEFAULT 0.0, operador_nome TEXT DEFAULT \'Posto Vago - Aguardando MOD\', custo_minuto_operador REAL DEFAULT 0.0, salario_base REAL DEFAULT 0.0, valor_adicionais REAL DEFAULT 0.0)')
     cursor.execute('CREATE TABLE IF NOT EXISTS materiais (id SERIAL PRIMARY KEY, codigo_material TEXT UNIQUE NOT NULL, nome_material TEXT NOT NULL, preco_unidade REAL NOT NULL, volume_disponivel REAL DEFAULT 0.0)')
     cursor.execute('CREATE TABLE IF NOT EXISTS produtos (id SERIAL PRIMARY KEY, codigo_produto TEXT UNIQUE NOT NULL, nome_produto TEXT NOT NULL, custo_total_fabricacao REAL DEFAULT 0.0)')
@@ -60,14 +59,13 @@ def init_db():
     cursor.execute('CREATE TABLE IF NOT EXISTS caixa (id SERIAL PRIMARY KEY, descricao TEXT, tipo TEXT, valor REAL, data_movimentação TEXT)')
 
     # 2. Carga Inicial de Dados (Mapeamento de segurança contra duplicidade)
-    # Verificação de tabela vazia para evitar quebras por restrições UNIQUE do Postgres
     cursor.execute('SELECT COUNT(*) FROM usuarios')
     if cursor.fetchone()[0] == 0:
         cursor.execute('INSERT INTO usuarios (usuario, senha, aprovado) VALUES (%s, %s, %s)', ('admin', generate_password_hash('admin'), 1))
         
     cursor.execute('SELECT COUNT(*) FROM investimentos_imobiliarios')
     if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO investimentos_imobiliarios (cidade_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, retorno_acionistas, capital_inicial_negocio) VALUES ('Metalúrgica Modelo S/A - Cenário Base', 'Curitiba CIC', 'CIC (Distrito Industrial)', 450.00, 11.39, 3825000.00, 13500.00, 25.0, 500000.00)")
+        cursor.execute("INSERT INTO investimentos_imobiliarios (cidade_regiao, bairro_imovel, area_imovel, valor_imovel_estimado, taxa_selic, aluguel_regional, retorno_acionistas, capital_inicial_negocio) VALUES ('Metalúrgica Modelo S/A - Cenário Base', 'Curitiba CIC', 'CIC (Distrito Industrial)', 450.00, 11.39, 3825000.00, 13500.00, 25.0, 500000.00)")
         
     cursor.execute('SELECT COUNT(*) FROM materiais')
     if cursor.fetchone()[0] == 0:
@@ -77,7 +75,7 @@ def init_db():
     cursor.execute('SELECT COUNT(*) FROM maquinas')
     if cursor.fetchone()[0] == 0:
         for k, v in CATALOGO_MAQUINAS.items():
-            cursor.execute('INSERT INTO maquinas (nome_equipamento, potencia, consumo_eletrico, velocidade, preco_compra, depreciacao_mensal, custo_minuto_maquina) VALUES (%s, %s, %s, %s, %s, %s, %s)', (v['nome'], v['pot'], v['consumo'], v['vel'], v['preco'], v['dep'], 0.15))
+            cursor.execute('INSERT INTO maquinas (nome_equipamento, potencia, consumo_eletrico, velocidad, preco_compra, depreciacao_mensal, custo_minuto_maquina) VALUES (%s, %s, %s, %s, %s, %s, %s)', (v['nome'], v['pot'], v['consumo'], v['vel'], v['preco'], v['dep'], 0.15))
             
     cursor.execute('SELECT COUNT(*) FROM produtos')
     if cursor.fetchone()[0] == 0:
