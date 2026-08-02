@@ -29,8 +29,16 @@ CATALOGO_MATERIAIS = {
 }
 
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
+    # Lê a URL de conexão direta fornecida pela Render nas variáveis de ambiente
+    db_url = os.environ.get('DATABASE_URL')
+    
+    # Se a URL começar com 'postgres://', converte para 'postgresql://' (exigência do Python)
+    if db_url and db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+        
+    import psycopg2
+    from psycopg2.extras import DictCursor
+    conn = psycopg2.connect(db_url, cursor_factory=DictCursor)
     return conn
 def init_db():
     conn = get_db_connection()
