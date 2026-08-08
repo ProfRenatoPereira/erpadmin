@@ -398,22 +398,25 @@ def imprimir_holerite(id, tipo):
         conn.close()
         return "Colaborador não localizado."
     
-    # Mapeamento e cálculos extraídos com segurança do dicionário do PostgreSQL
+    # Extração de valores financeiros brutos
     salario = float(col.get('salario_base') or 0.0)
     adicionais = float(col.get('valor_adicionais') or 0.0)
     
-    # Lógica de tipos e impostos
-    # ... (Mantendo os cálculos de INSS/IRRF baseados em tabela progressiva estrutural) ...
+    # Execução das regras de desconto progressivo da CLT
+    valor_inss = calcular_inss(salario + adicionais)
+    valor_irrf = calcular_irrf(salario + adicionais, valor_inss)
+    valor_liquido = (salario + adicionais) - (valor_inss + valor_irrf)
     
-    # CORREÇÃO: Dicionário alimentado com todas as chaves exigidas pelo arquivo html para sanar o erro 500
+    # CORREÇÃO: Dicionário alimentado com as chaves exatas exigidas pelo HTML (incluindo 'he')
     dados_holerite = {
         "tipo_recibo": "RECIBO..." if tipo != "ferias" else "FÉRIAS", 
         "nome": col.get('operador_nome', 'Colaborador'),
         "principal_valor": salario,
         "adicionais": adicionais,
-        "inss": 0.0,  # Adicione o cálculo real da tabela progressiva se aplicável
-        "irrf": 0.0,  # Adicione o cálculo real da tabela progressiva se aplicável
-        "liquido": salario + adicionais
+        "he": adicionais,  # Define 'he' para sanar o erro 500 na linha 170 do HTML
+        "inss": valor_inss,
+        "irrf": valor_irrf,
+        "liquido": valor_liquido
     }
     
     cursor.close()
