@@ -6,122 +6,61 @@
     <title>Gerenciador de Pessoal e Recursos Humanos</title>
     <link rel="icon" type="image/png" href="static/logo.png">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        /* --- ESTILOS DE ACESSIBILIDADE BASEADOS NO MODELO --- */
-        
-        /* 1. MODO ESCURO (Tema Padrão / Ativo por padrão no modelo) */
-        body {
-            background-color: #0d1117;
-            color: #c9d1d9;
-            font-family: Arial, sans-serif;
-            transition: background-color 0.3s, color 0.3s;
-        }
-        .barra-acessibilidade {
-            background-color: #0b132b;
-            padding: 12px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            border-bottom: 2px solid #1f2937;
-        }
-        .btn-acessibilidade {
-            background-color: #ffffff;
-            color: #000000;
-            border: 2px solid #000000;
-            border-radius: 4px;
-            padding: 6px 12px;
-            font-weight: bold;
-            font-size: 14px;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .btn-acessibilidade.btn-azul {
-            background-color: #0056b3;
-            color: #ffffff;
-            border-color: #004085;
-        }
-        .card-rh {
-            background-color: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        .form-control {
-            width: 100%;
-            padding: 10px;
-            border-radius: 6px;
-            border: 1px solid #30363d;
-            background-color: #0d1117;
-            color: #ffffff;
-            box-sizing: border-box;
-            font-size: 16px;
-        }
+     <style>
+        /* Estrutura Base e Painéis Dinâmicos */
+        .bi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
+        .chart-box { background: #fff; padding: 1.5rem; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .chart-box h4 { color: #1e3a8a; margin-bottom: 1rem; font-size: 1.1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; }
+        .pizza-wrapper { display: flex; align-items: center; justify-content: center; height: 160px; }
+        .pizza-native { width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(#16a34a 0% 100%); transition: background 0.3s; }
+        .bar-container { display: flex; align-items: flex-end; justify-content: space-around; height: 150px; border-bottom: 2px solid #94a3b8; padding-top: 10px; gap: 5px; }
+        .bar-wrapper { display: flex; flex-direction: column; align-items: center; flex-grow: 1; }
+        .bar-native { width: 100%; max-width: 45px; background: #1e3a8a; border-radius: 4px 4px 0 0; transition: height 0.5s; text-align: center; color: white; font-size: 0.75rem; font-weight: bold; display: flex; align-items: flex-start; justify-content: center; padding-top: 5px; height: 0%; }
+        .bar-label { font-size: 0.7rem; text-align: center; margin-top: 0.5rem; color: #475569; font-weight: 600; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .linear-wrapper { display: flex; flex-direction: column; gap: 0.6rem; justify-content: center; min-height: 150px; }
+        .linear-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; }
+        .linear-name { width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: #334155; }
+        .linear-bar-bg { background: #e2e8f0; border-radius: 4px; flex-grow: 1; height: 14px; overflow: hidden; position: relative; }
+        .linear-bar-fill { background: #0284c7; height: 100%; width: 0%; transition: width 0.5s; }
+        .linear-value { width: 75px; text-align: right; font-weight: bold; color: #0284c7; }
+        .btn-control { padding: 0.5rem; font-size: 0.85rem; font-weight: bold; cursor: pointer; border-radius: 6px; }
 
-        /* 2. ALTO CONTRASTE (Bordas Amarelas Espessas sobre Fundo Preto) */
-        .alto-contraste body {
-            background-color: #000000 !important;
-            color: #ffffff !important;
-        }
-        .alto-contraste .card-rh {
-            background-color: #000000 !important;
-            border: 3px solid #ffff00 !important;
-            color: #ffffff !important;
-            box-shadow: none !important;
-        }
-        .alto-contraste .form-control {
-            background-color: #000000 !important;
-            color: #ffff00 !important;
-            border: 3px solid #ffff00 !important;
-            font-weight: bold !important;
-        }
-        .alto-contraste label, .alto-contraste h1, .alto-contraste h3 {
-            color: #ffff00 !important;
-        }
-        .alto-contraste .card-caixa-mestre {
-            background-color: #000000 !important;
-            border: 3px solid #ffff00 !important;
-            color: #ffffff !important;
-        }
+        /* --- SISTEMA DE ACESSIBILIDADE VISUAL (Toda a página) --- */
+        html { font-size: 16px; transition: font-size 0.15s ease; }
+        body.dark-mode { background-color: #121212 !important; color: #e2e2e2 !important; }
+        body.dark-mode .card, body.dark-mode .chart-box { background: #1e293b !important; border-color: #334155 !important; color: #f8fafc !important; }
+        body.dark-mode .chart-box h4 { color: #38bdf8 !important; border-bottom-color: #334155 !important; }
+        body.dark-mode input, body.dark-mode select { background: #0f172a !important; color: #fff !important; border-color: #334155 !important; }
+        body.dark-mode .bar-label { color: #cbd5e1 !important; }
 
-        /* 3. MODO CLARO (Inversão para visual convencional) */
-        .modo-claro body {
-            background-color: #f4f6f9 !important;
-            color: #333333 !important;
-        }
-        .modo-claro .card-rh {
-            background-color: #ffffff !important;
-            border: 1px solid #bdc3c7 !important;
-            color: #333333 !important;
-        }
-        .modo-claro .form-control {
-            background-color: #ffffff !important;
-            color: #000000 !important;
-            border: 1px solid #bdc3c7 !important;
-        }
-        
-        /* Grid responsivo universal */
-        .grid-colunas-rh {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            margin-bottom: 25px;
-        }
+        /* Alto Contraste Extremo */
+        body.alto-contraste { background-color: #000000 !important; color: #ffff00 !important; }
+        body.alto-contraste .card, body.alto-contraste .chart-box, body.alto-contraste table, body.alto-contraste th, body.alto-contraste td { background: #000000 !important; color: #ffffff !important; border: 2px solid #ffffff !important; }
+        body.alto-contraste input, body.alto-contraste select { background: #000000 !important; color: #ffff00 !important; border: 2px solid #ffff00 !important; }
+        body.alto-contraste button, body.alto-contraste .btn-print { background: #ffffff !important; color: #000000 !important; border: 2px solid #000000 !important; font-weight: bold !important; }
+        body.alto-contraste h1, body.alto-contraste h3, body.alto-contraste h4 { color: #ffff00 !important; }
+        body.alto-contraste .bar-native { background: #ffffff !important; color: #000000 !important; }
+        body.alto-contraste .linear-bar-fill { background: #ffff00 !important; }
     </style>
 </head>
-<body class="modo-escuro">
+<body>
 
-<!-- Barra de Acessibilidade Superior Baseada no Modelo Real -->
-<div class="barra-acessibilidade">
-    <span style="color: #fff; font-weight: bold; margin-right: 5px;">♿ Acessibilidade:</span>
-    <button class="btn-acessibilidade" onclick="mudarFonte(1)">A+</button>
-    <button class="btn-acessibilidade" onclick="mudarFonte(-1)">A-</button>
-    <button class="btn-acessibilidade" onclick="ativarAltoContraste()">⚫ Alto Contraste</button>
-    <button class="btn-acessibilidade" id="btnTema" onclick="alternarTema()">☀️ Modo Claro</button>
-    <button class="btn-acessibilidade btn-azul" id="btnAudio" onclick="alternarLeitor()">🔊 Ativar Leitor</button>
+<!-- BARRA DE ACESSIBILIDADE CORRIGIDA COM LOGO DISCRETA À ESQUERDA -->
+<div id="barra-acessibilidade" style="background: #0f172a; padding: 0.5rem 1rem; display: flex; justify-content: space-between; align-items: center; color: #fff; font-size: 0.85rem; font-family: sans-serif; border-bottom: 1px solid #334155;">
+    <!-- LOGO DISCRETA FIXADA À ESQUERDA -->
+    <div style="display: flex; align-items: center;">
+        <img src="{{ url_for('static', filename='Logo.svg') }}" alt="Logo ®ψΣ" style="height: 24px; width: auto; object-fit: contain; opacity: 0.9;">
+    </div>
+    
+    <!-- CONTROLES ALINHADOS PERFEITAMENTE À DIREITA -->
+    <div style="display: flex; gap: 0.8rem; align-items: center;">
+        <span>♿ Acessibilidade:</span>
+        <button type="button" onclick="mudarFonte(1)" style="background: #334155; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">A+</button>
+        <button type="button" onclick="mudarFonte(-1)" style="background: #334155; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">A-</button>
+        <button type="button" onclick="alternarAltoContraste()" style="background: #334155; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">⚫ Alto Contraste</button>
+        <button type="button" id="btn_tema" style="background: #334155; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">🌙 Modo Escuro</button>
+        <button type="button" id="btn-leitor-audio" onclick="alternarLeitorAudio()" style="background: #0284c7; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">🔊 Ativar Leitor</button>
+    </div>
 </div>
 
 <!-- Cabeçalho Principal Terceiro ADM Associados -->
