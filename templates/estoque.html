@@ -7,56 +7,61 @@
     <title>Inventário de Acabados e Controle de Estoque</title>
     <link rel="icon" type="image/png" href="static/logo.png">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        /* CSS de Segurança para Alto Contraste Nativo nas Tabelas e Alertas */
-        .alto-contraste body {
-            background-color: #000000 !important;
-            color: #ffffff !important;
-        }
-        .alto-contraste .data-table th {
-            background-color: #1e1e1e !important;
-            color: #ffffff !important;
-            border: 1px solid #ffffff !important;
-        }
-        .alto-contraste .data-table td {
-            background-color: #000000 !important;
-            color: #ffffff !important;
-            border: 1px solid #ffffff !important;
-        }
-        .alto-contraste code {
-            background-color: #2a2a2a !important;
-            color: #00ff00 !important;
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-        .alto-contraste .alert {
-            background-color: #111111 !important;
-            color: #ffffff !important;
-            border: 2px solid #ffffff !important;
-        }
-        
-        /* Contêiner para rolagem de tabelas em dispositivos móveis */
-        .tabela-responsiva {
-            overflow-x: auto;
-            width: 100%;
-            margin-bottom: 30px;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        .btn-acao-tabela {
-            font-size: 14px; 
-            padding: 6px 12px;
-            cursor: pointer;
-        }
+     <style>
+        /* Estrutura Base e Painéis Dinâmicos */
+        .bi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
+        .chart-box { background: #fff; padding: 1.5rem; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .chart-box h4 { color: #1e3a8a; margin-bottom: 1rem; font-size: 1.1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; }
+        .pizza-wrapper { display: flex; align-items: center; justify-content: center; height: 160px; }
+        .pizza-native { width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(#16a34a 0% 100%); transition: background 0.3s; }
+        .bar-container { display: flex; align-items: flex-end; justify-content: space-around; height: 150px; border-bottom: 2px solid #94a3b8; padding-top: 10px; gap: 5px; }
+        .bar-wrapper { display: flex; flex-direction: column; align-items: center; flex-grow: 1; }
+        .bar-native { width: 100%; max-width: 45px; background: #1e3a8a; border-radius: 4px 4px 0 0; transition: height 0.5s; text-align: center; color: white; font-size: 0.75rem; font-weight: bold; display: flex; align-items: flex-start; justify-content: center; padding-top: 5px; height: 0%; }
+        .bar-label { font-size: 0.7rem; text-align: center; margin-top: 0.5rem; color: #475569; font-weight: 600; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .linear-wrapper { display: flex; flex-direction: column; gap: 0.6rem; justify-content: center; min-height: 150px; }
+        .linear-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; }
+        .linear-name { width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: #334155; }
+        .linear-bar-bg { background: #e2e8f0; border-radius: 4px; flex-grow: 1; height: 14px; overflow: hidden; position: relative; }
+        .linear-bar-fill { background: #0284c7; height: 100%; width: 0%; transition: width 0.5s; }
+        .linear-value { width: 75px; text-align: right; font-weight: bold; color: #0284c7; }
+        .btn-control { padding: 0.5rem; font-size: 0.85rem; font-weight: bold; cursor: pointer; border-radius: 6px; }
+
+        /* --- SISTEMA DE ACESSIBILIDADE VISUAL (Toda a página) --- */
+        html { font-size: 16px; transition: font-size 0.15s ease; }
+        body.dark-mode { background-color: #121212 !important; color: #e2e2e2 !important; }
+        body.dark-mode .card, body.dark-mode .chart-box { background: #1e293b !important; border-color: #334155 !important; color: #f8fafc !important; }
+        body.dark-mode .chart-box h4 { color: #38bdf8 !important; border-bottom-color: #334155 !important; }
+        body.dark-mode input, body.dark-mode select { background: #0f172a !important; color: #fff !important; border-color: #334155 !important; }
+        body.dark-mode .bar-label { color: #cbd5e1 !important; }
+
+        /* Alto Contraste Extremo */
+        body.alto-contraste { background-color: #000000 !important; color: #ffff00 !important; }
+        body.alto-contraste .card, body.alto-contraste .chart-box, body.alto-contraste table, body.alto-contraste th, body.alto-contraste td { background: #000000 !important; color: #ffffff !important; border: 2px solid #ffffff !important; }
+        body.alto-contraste input, body.alto-contraste select { background: #000000 !important; color: #ffff00 !important; border: 2px solid #ffff00 !important; }
+        body.alto-contraste button, body.alto-contraste .btn-print { background: #ffffff !important; color: #000000 !important; border: 2px solid #000000 !important; font-weight: bold !important; }
+        body.alto-contraste h1, body.alto-contraste h3, body.alto-contraste h4 { color: #ffff00 !important; }
+        body.alto-contraste .bar-native { background: #ffffff !important; color: #000000 !important; }
+        body.alto-contraste .linear-bar-fill { background: #ffff00 !important; }
     </style>
 </head>
 <body>
+
+<!-- BARRA DE ACESSIBILIDADE CORRIGIDA COM LOGO DISCRETA À ESQUERDA -->
+<div id="barra-acessibilidade" style="background: #0f172a; padding: 0.5rem 1rem; display: flex; justify-content: space-between; align-items: center; color: #fff; font-size: 0.85rem; font-family: sans-serif; border-bottom: 1px solid #334155;">
+    <!-- LOGO DISCRETA FIXADA À ESQUERDA -->
+    <div style="display: flex; align-items: center;">
+        <img src="{{ url_for('static', filename='Logo.svg') }}" alt="Logo ®ψΣ" style="height: 24px; width: auto; object-fit: contain; opacity: 0.9;">
+    </div>
     
-<!-- Barra de Acessibilidade Superior Oficial -->
-<div class="barra-acessibilidade">
-    <button class="btn-acessibilidade" onclick="alternarAltoContraste()">Acessibilidade 🌓 Alto Contraste</button>
-    <button class="btn-acessibilidade" onclick="mudarFonte(1)">A+</button>
-    <button class="btn-acessibilidade" onclick="mudarFonte(-1)">A-</button>
+    <!-- CONTROLES ALINHADOS PERFEITAMENTE À DIREITA -->
+    <div style="display: flex; gap: 0.8rem; align-items: center;">
+        <span>♿ Acessibilidade:</span>
+        <button type="button" onclick="mudarFonte(1)" style="background: #334155; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">A+</button>
+        <button type="button" onclick="mudarFonte(-1)" style="background: #334155; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">A-</button>
+        <button type="button" onclick="alternarAltoContraste()" style="background: #334155; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">⚫ Alto Contraste</button>
+        <button type="button" id="btn_tema" style="background: #334155; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">🌙 Modo Escuro</button>
+        <button type="button" id="btn-leitor-audio" onclick="alternarLeitorAudio()" style="background: #0284c7; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">🔊 Ativar Leitor</button>
+    </div>
 </div>
 
 <!-- Cabeçalho Principal Terceiro ADM Associados -->
