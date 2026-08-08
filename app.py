@@ -908,6 +908,8 @@ def roi():
 def iniciar_banco():
     conexao = obter_conexao()
     cursor = conexao.cursor()
+    
+    # 1. Criando tabela de funcionarios
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS funcionarios (
             id SERIAL PRIMARY KEY, nome TEXT NOT NULL, cargo TEXT, salario REAL, horas_comp REAL, insalubridade REAL,
@@ -919,11 +921,8 @@ def iniciar_banco():
             plano_saude REAL DEFAULT 0, plano_odontologico REAL DEFAULT 0, sindicato REAL DEFAULT 0, vale_farmacia REAL DEFAULT 0, ano_ref TEXT DEFAULT '2026'
         )
     ''')
-    conexao.commit()
-    cursor.close()
-    conexao.close()
     
-       # Migração Segura: Adiciona individualmente as novas colunas caso elas já não existam no Supabase
+    # 2. Migrações Seguras (Adicionando colunas novas)
     try:
         cursor.execute("ALTER TABLE funcionarios ADD COLUMN IF NOT EXISTS v_he_25 REAL DEFAULT 0;")
         cursor.execute("ALTER TABLE funcionarios ADD COLUMN IF NOT EXISTS v_he_50 REAL DEFAULT 0;")
@@ -934,11 +933,16 @@ def iniciar_banco():
     except psycopg2.Error:
         pass
 
+    # 3. Criando tabela de cargos_custom
     cursor.execute('CREATE TABLE IF NOT EXISTS cargos_custom (id SERIAL PRIMARY KEY, nome_cargo TEXT UNIQUE)')
+    
+    # 4. Alimentando cargos iniciais se vazia
     cursor.execute("SELECT COUNT(*) FROM cargos_custom")
     if cursor.fetchone()[0] == 0:
         cargos = [("Diretoria",), ("Gerência",), ("Analista",), ("Operacional",)]
         cursor.executemany("INSERT INTO cargos_custom (nome_cargo) VALUES (%s)", cargos)
+        
+    # 5. Efetivando todas as alterações e fechando de forma correta
     conexao.commit()
     cursor.close()
     conexao.close()
