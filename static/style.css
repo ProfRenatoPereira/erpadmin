@@ -248,3 +248,309 @@ input:readonly, input[readonly] {
 .alto-contraste .card-caixa-mestre h4, .alto-contraste .card-caixa-mestre span {
     color: #ffffff !important;
 }
+
+
+
+
+
+/* --- ARQUIVO CSS UNIFICADO: RESPONSIVIDADE DO SMARTPHONE À SUPER TV --- */
+
+:root {
+    --primary: #1e3a8a;
+    --primary-hover: #172554;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --background: #f1f5f9;
+    --surface: #ffffff;
+    --text: #0f172a;
+    --border: #cbd5e1;
+}
+
+* { 
+    box-sizing: border-box; 
+    margin: 0; 
+    padding: 0; 
+    font-family: 'Segoe UI', system-ui, sans-serif; 
+}
+
+html { 
+    /* Clamping: Garante fontes legíveis em celular e confortáveis em telas de 80" */
+    font-size: clamp(14px, 0.85vw + 10px, 22px); 
+    transition: font-size 0.15s ease; 
+}
+
+body { 
+    background: var(--background); 
+    color: var(--text); 
+    padding: clamp(0.75rem, 2vw, 2rem); /* Padding se adapta dinamicamente à tela */
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.container { 
+    width: 100%;
+    max-width: 1440px; /* Limita a largura em telas de 80" para evitar distorção visual */
+    margin: 0 auto; 
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+header { 
+    margin-bottom: 1.5rem; 
+    border-bottom: 3px solid var(--primary); 
+    padding-bottom: 0.75rem; 
+    display: flex; 
+    flex-direction: row;
+    flex-wrap: wrap; /* Permite que os elementos quebrem linha se faltar espaço */
+    justify-content: space-between; 
+    align-items: center; 
+    gap: 1rem;
+}
+
+header h1 { 
+    color: var(--primary); 
+    font-size: 1.8rem; 
+}
+
+header p {
+    font-size: 0.9rem;
+    color: #475569;
+}
+
+/* --- CORREÇÃO DE CURSORES E ELEMENTOS INTERATIVOS --- */
+button, 
+.btn-print, 
+.btn-link, 
+.btn-delete, 
+a[onclick], 
+tr[onclick] {
+    cursor: pointer !important; /* Força a mãozinha em absolutamente todas as ações */
+}
+
+.btn-link {
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-weight: bold;
+    display: inline-block;
+}
+.grid-config { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); 
+    gap: 1rem; 
+    margin-bottom: 1.5rem; 
+}
+
+.card { 
+    background: var(--surface); 
+    padding: 1.25rem; 
+    border-radius: 8px; 
+    border: 1px solid var(--border); 
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+}
+
+.card h3 { 
+    margin-bottom: 0.75rem; 
+    color: var(--primary); 
+    font-size: 1.1rem; 
+    border-bottom: 1px solid var(--border); 
+    padding-bottom: 0.25rem; 
+}
+
+.form-group { 
+    margin-bottom: 0.75rem; 
+}
+
+label { 
+    display: block; 
+    font-size: 0.8rem; 
+    font-weight: 600; 
+    margin-bottom: 0.2rem; 
+    color: #475569; 
+}
+
+input, select { 
+    width: 100%; 
+    padding: 0.45rem; 
+    border: 1px solid var(--border); 
+    border-radius: 6px; 
+    font-size: 0.9rem; 
+    background: #fff;
+}
+
+button { 
+    background: var(--primary); 
+    color: white; 
+    padding: 0.5rem 1rem; 
+    border: none; 
+    border-radius: 6px; 
+    font-weight: 600; 
+    cursor: pointer; 
+    transition: background 0.2s;
+}
+
+button:hover { background: var(--primary-hover); }
+
+button.btn-add { 
+    background: var(--success); 
+    width: 100%; 
+    margin-top: 0.5rem; 
+    padding: 0.65rem; 
+}
+button.btn-add:hover { background: #15803d; }
+
+button.btn-print { background: #475569; }
+button.btn-print:hover { background: #334155; }
+
+.dashboard { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+    gap: 0.75rem; 
+    margin-bottom: 1.5rem; 
+}
+/* AJUSTE DE CONTRASTE DA LOGO DA BARRA DE ACESSIBILIDADE */
+#barra-acessibilidade img {
+    transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+body.alto-contraste #barra-acessibilidade img {
+    filter: brightness(0) invert(1); /* Deixa a logo puramente branca para leitura em alto contraste */
+    opacity: 1;
+}
+
+/* REGRAS DE SUPORTE AO NOVO RODAPÉ INSTITUCIONAL */
+footer.rodape-legal {
+    transition: color 0.15s ease, border-color 0.15s ease;
+    margin-top: auto !important; /* Força o rodapé a ir para o final vertical, nunca para o lado */
+    width: 100% !important;
+    clear: both !important;
+    padding-top: 1.5rem;
+    border-top: 2px solid var(--primary);
+}
+
+/* Integração com o Modo Escuro do Sistema */
+body.dark-mode footer.rodape-legal {
+    color: #94a3b8 !important;
+    border-top-color: #38bdf8 !important;
+}
+body.dark-mode footer.rodape-legal .copyright-texto {
+    color: #38bdf8 !important;
+}
+
+/* Integração com o Alto Contraste Extremo do Sistema */
+body.alto-contraste footer.rodape-legal {
+    color: #ffffff !important;
+    border-top: 2px solid #ffffff !important;
+}
+body.alto-contraste footer.rodape-legal .copyright-texto {
+    color: #ffff00 !important;
+}
+
+/* --- ADAPTAÇÃO COMPLETA: DO MENOR SMARTPHONE ATÉ SUPER TVS --- */
+
+/* 1. Regras para Telas Menores e Smartphones em Retrato (Até 768px) */
+@media (max-width: 768px) {
+    body {
+        padding: 0.5rem !important;
+    }
+    
+    header {
+        flex-direction: column !important;
+        text-align: center !important;
+        align-items: center !important;
+        gap: 0.8rem !important;
+    }
+    
+    header div[style*="display: flex"] {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 0.3rem !important;
+    }
+
+    .actions-header {
+        width: 100% !important;
+        flex-direction: column !important;
+        gap: 0.5rem !important;
+    }
+
+    .actions-header button {
+        width: 100% !important;
+        padding: 0.65rem !important;
+    }
+
+    /* Evita que as cores de fundo quebrem o contraste */
+    .card, .chart-box {
+        padding: 1rem !important;
+        background: #ffffff !important;
+        color: #0f172a !important;
+    }
+
+    /* Transforma os layouts de grid em uma única coluna vertical */
+    .grid-config, .dashboard, .bi-container {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+    }
+
+    /* Torna as tabelas roláveis lateralmente para não quebrar o layout */
+    .table-container {
+        overflow-x: auto !important;
+        width: 100% !important;
+        -webkit-overflow-scrolling: touch;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+    }
+    
+    table {
+        min-width: 750px !important; /* Garante que os dados fiquem legíveis na rolagem */
+    }
+
+    .actions-cell {
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+    }
+
+    /* Ajuste para a nova Central de Auditoria no celular */
+    .chart-box div[style*="display: grid"] {
+        grid-template-columns: 1fr !important;
+    }
+    
+    #barra-acessibilidade {
+        flex-direction: column !important;
+        gap: 0.5rem !important;
+        padding: 0.75rem 0.5rem !important;
+    }
+    
+    #barra-acessibilidade div {
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        gap: 0.4rem !important;
+    }
+}
+
+/* 2. Regras para Telas Médias e Notebooks (De 769px até 1200px) */
+@media (min-width: 769px) and (max-width: 1200px) {
+    .grid-config {
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)) !important;
+    }
+    .dashboard {
+        grid-template-columns: repeat(3, 1fr) !important;
+    }
+    .bi-container {
+        grid-template-columns: 1fr 1fr !important;
+    }
+}
+
+/* 3. Regras Especiais para Telas Ultra-Gigantes e TVs de 80" (Acima de 2000px) */
+@media (min-width: 2000px) {
+    .container {
+        max-width: 1800px !important; /* Expande um pouco o limite para aproveitar a TV */
+    }
+    .card {
+        padding: 2rem !important; /* Aumenta o espaçamento interno para melhorar o visual */
+    }
+    input, select, button {
+        padding: 0.75rem !important; /* Aumenta a área de clique/toque na tela gigante */
+    }
+}
