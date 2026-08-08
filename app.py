@@ -968,6 +968,11 @@ iniciar_banco()
 def index():
     return render_template('index.html')
 
+# Inicializa o banco de dados criando as tabelas se não existirem
+iniciar_banco()
+
+# --- GERENCIAMENTO DE CARGOS DA API ---
+
 @app.route('/api/cargos', methods=['GET', 'POST'])
 def gerenciar_cargos():
     conexao = obter_conexao()
@@ -986,7 +991,7 @@ def gerenciar_cargos():
         return jsonify({'status': 'sucesso'})
     else:
         cursor.execute('SELECT nome_cargo FROM cargos_custom ORDER BY nome_cargo')
-        cargos = [linha[0] for linha in cursor.fetchall()]
+        cargos = [linha for linha in cursor.fetchall()]
         cursor.close()
         conexao.close()
         return jsonify(cargos)
