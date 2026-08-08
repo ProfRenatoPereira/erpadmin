@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folha-TERADMAS</title>
+    <link rel="icon" type="image/png" href="static/logo.png">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Estrutura Base e Painéis Dinâmicos */
+        .bi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-top: 2rem; }
+        .chart-box { background: #fff; padding: 1.5rem; border-radius: 8px; border: 1px solid #cbd5e1; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .chart-box h4 { color: #1e3a8a; margin-bottom: 1rem; font-size: 1.1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem; }
+        .pizza-wrapper { display: flex; align-items: center; justify-content: center; height: 160px; }
+        .pizza-native { width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(#16a34a 0% 100%); transition: background 0.3s; }
+        .bar-container { display: flex; align-items: flex-end; justify-content: space-around; height: 150px; border-bottom: 2px solid #94a3b8; padding-top: 10px; gap: 5px; }
+        .bar-wrapper { display: flex; flex-direction: column; align-items: center; flex-grow: 1; }
+        .bar-native { width: 100%; max-width: 45px; background: #1e3a8a; border-radius: 4px 4px 0 0; transition: height 0.5s; text-align: center; color: white; font-size: 0.75rem; font-weight: bold; display: flex; align-items: flex-start; justify-content: center; padding-top: 5px; height: 0%; }
+        .bar-label { font-size: 0.7rem; text-align: center; margin-top: 0.5rem; color: #475569; font-weight: 600; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .linear-wrapper { display: flex; flex-direction: column; gap: 0.6rem; justify-content: center; min-height: 150px; }
+        .linear-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; }
+        .linear-name { width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: #334155; }
+        .linear-bar-bg { background: #e2e8f0; border-radius: 4px; flex-grow: 1; height: 14px; overflow: hidden; position: relative; }
+        .linear-bar-fill { background: #0284c7; height: 100%; width: 0%; transition: width 0.5s; }
+        .linear-value { width: 75px; text-align: right; font-weight: bold; color: #0284c7; }
+        .btn-control { padding: 0.5rem; font-size: 0.85rem; font-weight: bold; cursor: pointer; border-radius: 6px; }
+
+        /* --- SISTEMA DE ACESSIBILIDADE VISUAL (Toda a página) --- */
+        html { font-size: 16px; transition: font-size 0.15s ease; }
+        body.dark-mode { background-color: #121212 !important; color: #e2e2e2 !important; }
+        body.dark-mode .card, body.dark-mode .chart-box { background: #1e293b !important; border-color: #334155 !important; color: #f8fafc !important; }
+        body.dark-mode .chart-box h4 { color: #38bdf8 !important; border-bottom-color: #334155 !important; }
+        body.dark-mode input, body.dark-mode select { background: #0f172a !important; color: #fff !important; border-color: #334155 !important; }
+        body.dark-mode .bar-label { color: #cbd5e1 !important; }
+
+        /* Alto Contraste Extremo */
+        body.alto-contraste { background-color: #000000 !important; color: #ffff00 !important; }
+        body.alto-contraste .card, body.alto-contraste .chart-box, body.alto-contraste table, body.alto-contraste th, body.alto-contraste td { background: #000000 !important; color: #ffffff !important; border: 2px solid #ffffff !important; }
+        body.alto-contraste input, body.alto-contraste select { background: #000000 !important; color: #ffff00 !important; border: 2px solid #ffff00 !important; }
+        body.alto-contraste button, body.alto-contraste .btn-print { background: #ffffff !important; color: #000000 !important; border: 2px solid #000000 !important; font-weight: bold !important; }
+        body.alto-contraste h1, body.alto-contraste h3, body.alto-contraste h4 { color: #ffff00 !important; }
+        body.alto-contraste .bar-native { background: #ffffff !important; color: #000000 !important; }
+        body.alto-contraste .linear-bar-fill { background: #ffff00 !important; }
+    </style>
+</head>
+<body>
+
+<!-- BARRA DE ACESSIBILIDADE CORRIGIDA COM LOGO DISCRETA À ESQUERDA -->
+<div id="barra-acessibilidade" style="background: #0f172a; padding: 0.5rem 1rem; display: flex; justify-content: space-between; align-items: center; color: #fff; font-size: 0.85rem; font-family: sans-serif; border-bottom: 1px solid #334155;">
+    <!-- LOGO DISCRETA FIXADA À ESQUERDA -->
+    <div style="display: flex; align-items: center;">
+        <img src="{{ url_for('static', filename='Logo.svg') }}" alt="Logo ®ψΣ" style="height: 24px; width: auto; object-fit: contain; opacity: 0.9;">
+    </div>
+    
+    <!-- CONTROLES ALINHADOS PERFEITAMENTE À DIREITA -->
+    <div style="display: flex; gap: 0.8rem; align-items: center;">
+        <span>♿ Acessibilidade:</span>
+        <button type="button" onclick="mudarFonte(1)" style="background: #334155; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">A+</button>
+        <button type="button" onclick="mudarFonte(-1)" style="background: #334155; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">A-</button>
+        <button type="button" onclick="alternarAltoContraste()" style="background: #334155; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">⚫ Alto Contraste</button>
+        <button type="button" id="btn_tema" style="background: #334155; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">🌙 Modo Escuro</button>
+        <button type="button" id="btn-leitor-audio" onclick="alternarLeitorAudio()" style="background: #0284c7; color: white; border: none; padding: 4px 10px; cursor: pointer; border-radius: 4px; font-weight: bold;">🔊 Ativar Leitor</button>
+    </div>
+</div>
+
+<div class="container">
+    <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 3px solid var(--primary); padding-bottom: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 1.2rem;">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt=" Logo TERADMAS" style=" height: 65px; width: auto; object-fit: contain;">
+            <div>
+                <h1 style="margin: 0; color: var(--primary); font-size: 1.8rem;">TERCEIRO ADM ASSOCIADOS</h1>
+                <p style="margin: 3px 0 0 0; font-size: 0.9rem; color: #475569;">Gerenciador de Pessoal | Abordagem Pedagógico-Didática de Custos</p>
+            </div>
+        </div>
+        <div class="actions-header" style="display: flex; gap: 0.5rem;">
+            <button class="btn-print" id="btn_balanco">🖨️ Imprimir Balanço</button>
+            <button class="btn-print" style="background:#0284c7" id="btn_13">🎄 Folha 13º Integral</button>
+        </div>
+    </header>
+    <div class="grid-config">
+        <div class="card">
+            <h3>Gestão de Caixa & Cargos</h3>
+            <div class="grid-config" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0;">
+                <div class="form-group">
+                    <label>Mês de Referência</label>
+                    <select id="mes_referencia">
+                        <option value="1">Janeiro</option><option value="2">Fevereiro</option>
+                        <option value="3">Março</option><option value="4">Abril</option>
+                        <option value="5">Maio</option><option value="6">Junho</option>
+                        <option value="7" selected>Julho</option><option value="8">Agosto</option>
+                        <option value="9">Setembro</option><option value="10">Outubro</option>
+                        <option value="11">Novembro</option><option value="12">Dezembro</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Ano de Referência</label>
+                    <input type="number" id="ano_referencia" value="2026" min="2000" max="2100">
+                </div>
+            </div>
+            <div class="form-group"><label>Receita Mensal (R$)</label><input type="number" id="receita_empresa" value="150000"></div>
+            <div class="form-group"><label>Limite Total de Pessoal</label><input type="number" id="limite_func" value="10"></div>
+            <div class="form-group" style="margin-top: 1.25rem; border-top: 1px solid var(--border); padding-top: 0.5rem;">
+                <label>Criar Novo Cargo Dinâmico</label>
+                <div style="display: flex; gap: 0.3rem;">
+                    <input type="text" id="novo_cargo_input" placeholder="Ex: Supervisor">
+                    <button type="button" class="btn-control" style="background:var(--primary); color:white;" id="btn_add_cargo">+</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Cadastro & Jornada</h3>
+            <input type="hidden" id="func_id_edicao" value="">
+            <div class="form-group"><label>Nome Completo</label><input type="text" id="nome" placeholder="Ex: Renato Silva"></div>
+            <div class="form-group"><label>Data de Admissão (CLT)</label><input type="date" id="data_admissao" value="2025-01-15"></div>
+            <div class="grid-config" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0;">
+                <div class="form-group"><label>Cargo / Função</label><select id="cargo"></select></div>
+                <div class="form-group"><label>Salário Base (R$)</label><input type="number" id="salario" value="3500"></div>
+            </div>
+            <div class="form-group">
+                <label>Departamento Vinculado</label>
+                <select id="departamento">
+                    <option value="Administrativo" selected>Administrativo</option>
+                    <option value="Financeiro">Financeiro</option>
+                    <option value="Operações / Fábrica">Operações / Fábrica</option>
+                    <option value="Comercial / Vendas">Comercial / Vendas</option>
+                </select>
+            </div>
+            <div class="grid-config" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0;">
+                <div class="form-group"><label>Horas Contratuais</label><input type="number" id="horas_comp" value="220"></div>
+                <div class="form-group">
+                    <label>Regime de Horas Extras</label>
+                    <select id="regime_he">
+                        <option value="pagar" selected>Pagar na Folha</option><option value="banco">Banco de Horas</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid-config" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0;">
+                <div class="form-group">
+                    <label>Turno</label>
+                    <select id="turno"><option value="diurno" selected>Diurno</option><option value="noturno">Noturno</option></select>
+                </div>
+                <div class="form-group"><label>Horário Entrada</label><input type="time" id="hora_entrada" value="08:00"></div>
+            </div>
+            <div class="grid-config" style="grid-template-columns: 1fr 1fr 1fr; gap: 0.3rem; margin-bottom: 0;">
+                <div class="form-group"><label>HE 25%</label><input type="number" id="he_semana" value="0"></div>
+                <div class="form-group"><label>HE 50%</label><input type="number" id="he_sabado" value="0"></div>
+                <div class="form-group"><label>HE 100%</label><input type="number" id="he_domingo" value="0"></div>
+            </div>
+            <div class="grid-config" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0;">
+                <div class="form-group"><label>Benefícios (R$)</label><input type="number" id="beneficios" value="500"></div>
+                <div class="form-group"><label>Filhos &lt; 14</label><input type="number" id="qtd_filhos" value="0"></div>
+            </div>
+            <div class="form-group"><label>Observações</label><input type="text" id="observacoes"></div>
+        </div>
+        <div class="card">
+            <h3>Retenções & Promoção</h3>
+            <div class="grid-config" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0;">
+                <div class="form-group"><label>Vale Farmácia (R$)</label><input type="number" id="vale_farmacia" value="0"></div>
+                <div class="form-group"><label>Sindicato (R$)</label><input type="number" id="sindicato" value="0"></div>
+            </div>
+            <div class="grid-config" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0;">
+                <div class="form-group"><label>Plano de Saúde (R$)</label><input type="number" id="plano_saude" value="0"></div>
+                <div class="form-group"><label>Plano Odontol. (R$)</label><input type="number" id="plano_odontologico" value="0"></div>
+            </div>
+            <div class="grid-config" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0;">
+                <div class="form-group"><label>Vale Refeição (R$)</label><input type="number" id="vale_refeicao" value="0"></div>
+                <div class="form-group"><label>Vale Mercado (R$)</label><input type="number" id="vale_mercado" value="0"></div>
+            </div>
+            <div class="grid-config" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0;">
+                <div class="form-group">
+                    <label>Adiantamento</label>
+                    <select id="adiantamento"><option value="sim">Sim</option><option value="nao" selected>Não</option></select>
+                </div>
+                <div class="form-group">
+                    <label>Descontar VT?</label>
+                    <select id="vt_desconto"><option value="sim">Sim</option><option value="nao" selected>Não</option></select>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+                <label style="color:#0284c7; font-weight: bold;">Simular Promoção (R$)</label>
+                <input type="number" id="novo_aumento_salarial" value="0">
+            </div>
+            <button class="btn-add" id="btn_contratar">Contratar Profissional</button>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 0.5rem;">
+                <button type="button" class="btn-control" style="background:#475569; color:white; border:none;" id="btn_salvar">💾 Salvar Dados</button>
+                <button type="button" class="btn-control" style="background:#cbd5e1; color:#0f172a; border:1px solid #94a3b8;" id="btn_limpar">🧹 Limpar Tela</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <div class="metric"><p>Funcionários Ativos</p><h2 id="dash_total_func">0 / 10</h2></div>
+        <div class="metric"><p>Custo Bruto Total</p><h2 id="dash_custo_bruto">R$ 0,00</h2></div>
+        <div class="metric"><p>Impostos Retidos</p><h2 id="dash_total_descontos" style="color: #dc2626">R$ 0,00</h2></div>
+        <div class="metric"><p>Líquido Bancário</p><h2 id="dash_folha_liquida">R$ 0,00</h2></div>
+        <div class="metric" id="card_balanco"><p>Margem Disponível</p><h2 id="dash_saldo_empresa">R$ 0,00</h2></div>
+    </div>
+
+    <div class="bi-container">
+        <div class="chart-box"><h4>📊 Divisão Macroeconômica (Pizza)</h4><div class="pizza-wrapper"><div id="nativePizza" class="pizza-native"></div></div></div>
+        <div class="chart-box"><h4>📊 Análise de Pareto por Cargo</h4><div id="nativePareto" class="bar-container"></div></div>
+        <div class="chart-box"><h4>📊 Elasticidade de Salário Bruto (Aumentos)</h4><div id="nativeLinear" class="linear-wrapper"></div></div>
+    </div>
+    <div class="section-title"><h2>Quadro Corporativo Corrente</h2><button class="btn-print" style="background:#0284c7" id="btn_print_list">🖨️ Imprimir Listagem</button></div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome / Admissão</th>
+                    <th>Cargo / Departamento</th>
+                    <th>Jornada / Turno</th>
+                    <th>Líquido Final</th>
+                    <th style="width: 360px;">Ações Legais e Rescisórias</th>
+                </tr>
+            </thead>
+            <tbody id="tabela_corpo"></tbody>
+        </table>
+    </div>
+    <!-- SEÇÃO ATUALIZADA: ESPELHO DE PONTO E HISTÓRICO CORPORATIVO -->
+    <div class="chart-box" style="margin-top: 2rem; margin-bottom: 2rem;">
+        <h4 style="color: #1e3a8a; font-size: 1.2rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem;">🗓️ Central de Auditoria de Ponto e Histórico Laboral</h4>
+        
+        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 1.5rem; align-items: flex-end; background: #f8fafc; padding: 1.25rem; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <div class="form-group" style="margin-bottom: 0; min-width: 240px; flex-grow: 1;">
+                <label style="display: block; font-weight: bold; margin-bottom: 0.3rem; color: #334155;">1. Selecione o Colaborador</label>
+                <select id="ponto_selecao_funcionario" class="input-control" onchange="carregarHistoricoDoColaborador()" style="width: 100%; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 4px; background: white;">
+                    <option value="">-- Escolha um Profissional --</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0; min-width: 160px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 0.3rem; color: #334155;">Mês/Ano de Apuração</label>
+                <input type="month" id="ponto_mes_referencia" class="input-control" value="2026-07" onchange="gerarCalendarioPontoAutomatizado()" style="width: 100%; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 0; min-width: 160px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 0.3rem; color: #334155;">Turno Vinculado</label>
+                <select id="ponto_turno" class="input-control" style="width: 100%; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 4px; background: white;">
+                    <option value="diurno" selected>Diurno (Comercial)</option>
+                    <option value="noturno">Noturno (Adicional)</option>
+                </select>
+            </div>
+            <div style="min-width: 200px;">
+                <button type="button" class="btn-print" onclick="executarCalculoPontoMensal()" style="background: #16a34a; color: white; border: none; padding: 0.6rem 1.2rem; font-weight: bold; border-radius: 4px; cursor: pointer; height: 38px; width: 100%;">⚙️ Processar Cartão de Ponto</button>
+            </div>
+        </div>
+
+        <!-- Divisão em duas colunas: Lançamento de Ponto à Esquerda e Histórico de Estudos à Direita -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+            <div>
+                <h5 style="margin: 0 0 0.5rem 0; color: #475569; font-size: 0.95rem;">📋 Lançamento de Horários Realizados</h5>
+                <div style="max-height: 320px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="background: #1e3a8a; color: white; text-align: left; position: sticky; top: 0; z-index: 10;">
+                                <th style="padding: 10px; width: 15%;">Dia</th>
+                                <th style="padding: 10px; width: 35%;">Dia da Semana</th>
+                                <th style="padding: 10px; width: 25%;">Entrada</th>
+                                <th style="padding: 10px; width: 25%;">Saída</th>
+                            </tr>
+                        </thead>
+                        <tbody id="corpo_ponto_mensal"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div>
+                <h5 style="margin: 0 0 0.5rem 0; color: #475569; font-size: 0.95rem;">📚 Histórico para Estudos e Fins Rescisórios</h5>
+                <div style="max-height: 320px; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; padding: 15px; box-sizing: border-box;">
+                    <div id="ponto_historico_vazio" style="color: #64748b; font-style: italic; text-align: center; padding: 40px 10px;">
+                        Selecione um colaborador acima para auditar o histórico de holerites e médias acumuladas para rescisão.
+                    </div>
+                    <div id="ponto_historico_conteudo" style="display: none; font-size: 0.85rem; color: #334155;">
+                        <!-- Preenchido dinamicamente via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEÇÃO ATUALIZADA: RODAPÉ INSTITUCIONAL, HOMENAGEM E EVOLUÇÃO TECNOLÓGICA -->
+    <footer style="margin-top: 3rem; padding-top: 1.5rem; border-top: 2px solid var(--primary); font-family: sans-serif; font-size: 0.8rem; color: #475569;" class="rodape-legal">
+        <p style="text-align: justify; line-height: 1.4; margin-bottom: 1rem;">
+            <strong>CRÉDITOS & HOMENAGEM:</strong> Autoras e autores de códigos, imagens, sons e demais conhecimentos utilizados e multiplicados neste projeto aberto. Uma construção que reflete a contínua interação entre o <em>Homo sapiens</em> tecnológico e a Inteligência Artificial. Sobretudo, toda gratidão por gentis críticas e generosa motivação creditadas por estimadas e valorosos estudantes.
+        </p>
+        <p style="text-align: center; margin-bottom: 0.5rem; font-weight: 600;">
+            Desenvolvido focado em diretrizes de acessibilidade web (WCAG).
+        </p>
+        <p style="text-align: center; margin-bottom: 0.3rem; font-weight: bold; color: var(--primary);" class="copyright-texto">
+            © Copyright Física Renato Pereira ®ψΣ.
+        </p>
+        <p style="text-align: center; margin-bottom: 0; color: #64748b;">
+            Ed. 00-10/2024. Rev. 01-05/2026.
+        </p>
+    </footer>
+</div>
+
+<div id="print-area" style="display: none;"></div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
