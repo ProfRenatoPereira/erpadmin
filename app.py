@@ -12,7 +12,7 @@ app.secret_key = 'chave_secreta_pedagogica'
 app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/', prefix='static/')
 
 # --- CONEXÃO COM O SUPABASE (POSTGRESQL) ---
-URL_SUPABASE = os.environ.get('DATABASE_URL', "postgresql://postgres:SUA_SENHA_AQUI@db.xxxxxx.supabase.co:5432/postgres")
+URL_SUPABASE = os.environ.get('DATABASE_URL', "postgresql://postgres:SUA_SENHA_AQUI@.xxxxxx.supabase.co:5432/postgres")
 
 def obter_conexao():
     return psycopg2.connect(URL_SUPABASE)
@@ -64,20 +64,39 @@ def init_db():
             INSERT INTO investimentos_imobiliarios (turma_nome, cidade_regiao, bairro_imovel, area_imovel, taxa_selic, valor_imovel_estimado, aluguel_regional, perc_acionistas, capital_inicial_negocio)
             VALUES ('Metalúrgica Modelo S/A - Cenário Base', 'Curitiba CIC', 'CIC (Distrito Industrial)', 450.00, 11.39, 3825000.00, 13500.00, 25.0, 500000.00)
         ''')
+        
+        id_maquina_capturado = None
         for k, m in CATALOGO_MAQUINAS.items():
             if k in ['cnc_romi', 'prensa_100t', 'forno_tempera']:
                 minutos_mes = 44 * 4.33 * 60
                 c_mm = (m['dep'] / minutos_mes) + ((m['pot'] * 0.75) / 60) + (13500.00 / minutos_mes)
+                # CORREÇÃO: Adicionado RETURNING id para capturar o ID real criado pelo Postgres
                 cursor.execute('''
                     INSERT INTO maquinas (nome_equipamento, potencia, consumo_eletrico, velocidade, avanco, comprimento_max, diametro_max, frequencia_manutencao, horas_trabalhadas, preco_compra, depreciacao_mensal, valor_venda_final, custo_minuto_maquina, operador_nome, custo_minuto_operador, salario_base, valor_adicionais, turno_trabalho, dia_semana, vida_util_meses)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0, %s, %s, %s, %s, %s, %s, %s, %s, 'Diurno', 'Regular', %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0, %s, %s, %s, %s, %s, %s, %s, %s, 'Diurno', 'Regular', %s) RETURNING id
                 ''', (m['nome'], m['pot'], m['cons'], m['vel'], m['avan'], m['comp'], m['diam'], m['mnt'], m['preco'], m['dep'], m['venda'], c_mm, m['operador'], m['custo_op'], m['salario'], m['adic'], m['vida']))
+                
+                res_maq = cursor.fetchone()
+                if k == 'cnc_romi' and res_maq:
+                    id_maquina_capturado = res_maq['id']
+
+        id_material_capturado = None
         for mat in CATALOGO_MATERIAIS.values():
-            cursor.execute("INSERT INTO materiais (codigo_material, nome_material, preco_unidade, dimensoes, volume_disponivel) VALUES (%s, %s, %s, %s, %s)", (mat['cod'], mat['nome'], mat['preco'], mat['dim'], mat['vol']))
-        cursor.execute("INSERT INTO produtos (id, codigo_produto, nome_produto, custo_total_fabricacao) VALUES (1, 'PROD-EIXO-CNC', 'Eixo de Transmissão Usinado', 115.40)")
-        cursor.execute("INSERT INTO estrutura_produto (produto_id, maquina_id, material_id, tempo_processo_min, quantidade_material) VALUES (1, 1, 2, 12.0, 1.5)")
-        cursor.execute("INSERT INTO formacao_precos (produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES (1, 5.0, 18.0, 9.25, 35.0, 245.50)")
-        cursor.execute("INSERT INTO estoque_produtos (produto_id, quantidade_disponivel) VALUES (1, 25.0)")
+            cursor.execute("INSERT INTO materiais (codigo_material, nome_material, preco_unidade, dimensoes, volume_disponivel) VALUES (%s, %s, %s, %s, %s) RETURNING id", (mat['cod'], mat['nome'], mat['preco'], mat['dim'], mat['vol']))
+            res_mat = cursor.fetchone()
+            if mat['cod'] == 'TAR-ACO-4140' and res_mat:
+                id_material_capturado = res_mat['id']
+                
+        cursor.execute("INSERT INTO produtos (codigo_produto, nome_produto, custo_total_fabricacao) VALUES ('PROD-EIXO-CNC', 'Eixo de Transmissão Usinado', 115.40) RETURNING id")
+        id_produto_capturado = cursor.fetchone()['id']
+        
+        # CORREÇÃO: Usa os IDs reais gerados dinamicamente para preservar a integridade das Foreign Keys
+        id_m_final = id_maquina_capturado if id_maquina_capturado else 1
+        id_mat_final = id_material_capturado if id_material_capturado else 2
+        
+        cursor.execute("INSERT INTO estrutura_produto (produto_id, maquina_id, material_id, tempo_processo_min, quantidade_material) VALUES (%s, %s, %s, 12.0, 1.5)", (id_produto_capturado, id_m_final, id_mat_final))
+        cursor.execute("INSERT INTO formacao_precos (produto_id, imposto_municipal, imposto_estadual, imposto_federal, margem_lucro, preco_venda_final) VALUES (%s, 5.0, 18.0, 9.25, 35.0, 245.50)", (id_produto_capturado,))
+        cursor.execute("INSERT INTO estoque_produtos (produto_id, quantidade_disponivel) VALUES (%s, 25.0)", (id_produto_capturado,))
         conn.commit()
     cursor.close()
     conn.close()
