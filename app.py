@@ -263,7 +263,8 @@ def salvar_colaborador():
     conn = get_db_connection()
     posto_vago = conn.execute("SELECT id FROM maquinas WHERE operador_nome = 'Posto Vago - Aguardando MOD' LIMIT 1").fetchone()
     if posto_vago:
-        conn.execute('UPDATE maquinas SET operador_nome=?, salario_base=?, valor_adicionais=?, turno_trabalho=?, dia_semana=?, custo_minuto_operador WHERE id=?', (request.form.get('nome_completo', 'Colaborador'), float(request.form.get('salario_base') or 0), float(request.form.get('valor_adicionais') or 0), request.form.get('turno', 'Diurno'), request.form.get('dia_semana', 'Regular'), float(request.form.get('custo_minuto_operador') or 0), posto_vago['id']))
+        # CORREÇÃO: Adicionado '=? ' que faltava após custo_minuto_operador para evitar erro de sintaxe SQL
+        conn.execute('UPDATE maquinas SET operador_nome=?, salario_base=?, valor_adicionais=?, turno_trabalho=?, dia_semana=?, custo_minuto_operador=? WHERE id=?', (request.form.get('nome_completo', 'Colaborador'), float(request.form.get('salario_base') or 0), float(request.form.get('valor_adicionais') or 0), request.form.get('turno', 'Diurno'), request.form.get('dia_semana', 'Regular'), float(request.form.get('custo_minuto_operador') or 0), posto_vago['id']))
         conn.commit()
         flash('MOD Alocado com sucesso!', 'success')
     else:
@@ -272,6 +273,7 @@ def salvar_colaborador():
         flash('Mão de Obra Indireta alocada.', 'success')
     conn.close()
     return redirect(url_for('rh'))
+
 @app.route('/imprimir_holerite/<int:id>/<string:tipo>')
 def imprimir_holerite(id, tipo):
     if not session.get('logado'): return redirect(url_for('index'))
@@ -294,9 +296,11 @@ def imprimir_holerite(id, tipo):
     # Lógica de tipos e impostos
     # ... (cálculos de INSS/IRRF baseados em tabela progressiva) ...
     
+    # CORREÇÃO: Adicionada a chave 'principal_valor' mapeando a variável local 'salario' exigida pelo Jinja2
     dados_holerite = {
         "tipo_recibo": "RECIBO..." if tipo != "ferias" else "FÉRIAS", 
         "nome": col['operador_nome'] if is_dict else col[14],
+        "principal_valor": salario,
         # ... outros campos mapeados ...
     }
     
