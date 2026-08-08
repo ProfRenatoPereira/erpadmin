@@ -962,14 +962,13 @@ def calcular_irrf(salario_contribuicao, desconto_inss):
     if base <= 4664.68: return (base * 0.225) - 662.77
     return (base * 0.275) - 896.00
 
+# Inicializa as tabelas do banco de dados no Supabase de forma segura
 iniciar_banco()
 
-@app.route('/')
-def index():
+# CORREÇÃO: Função renomeada para 'dashboard_principal' para eliminar o conflito no Flask
+@app.route('/dashboard')
+def dashboard_principal():
     return render_template('index.html')
-
-# Inicializa o banco de dados criando as tabelas se não existirem
-iniciar_banco()
 
 # --- GERENCIAMENTO DE CARGOS DA API ---
 
